@@ -65,8 +65,11 @@ export const profile = {
 /* -------------------------------------------------------------------------- */
 
 export type NewsItem = {
-  /** YYYY-MM 或 YYYY-MM-DD */
-  date: string;
+  /**
+   * 一律用 YYYY-MM，不要精确到日 —— 一栏里混着两种粒度很难看，
+   * 而且 news 这种东西月份就够了（Russ Cox 也只写到月）。
+   */
+  date: `${number}-${number}`;
   /** 一句话，支持行内 HTML */
   text: string;
 };
@@ -77,7 +80,7 @@ export type NewsItem = {
  */
 export const news: NewsItem[] = [
   {
-    date: '2026-08-15',
+    date: '2026-08',
     text: 'Robonix was officially released at the <a href="https://chinaosc.ccf.org.cn/">2026 CCF China Open Source Conference</a> in Chongqing, which ran a dedicated forum on embodied AI operating systems.',
   },
   {
