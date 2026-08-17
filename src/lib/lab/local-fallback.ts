@@ -37,10 +37,16 @@ const par = (description: string, children: RtdlNode[]): RtdlNode =>
 
 /** 去某处拿起某物：导航 → 看见 → 抓 */
 function fetch(obj: ObjectId, from: PlaceId): RtdlNode {
+  /*
+    「抓取」不是一个 primitive —— 标准契约里夹爪是 joint_command 上的
+    一个具名关节。所以拿起一个东西是四步：导航、在语义地图里定位、
+    末端到位、夹爪合拢。这正是 skill 存在的理由。
+  */
   return seq(`pick up ${OBJECTS[obj].label} from ${PLACES[from].label}`, [
-    doNode(`drive to ${PLACES[from].label}`, 'chassis.move', { target: from }),
-    doNode(`look for ${OBJECTS[obj].label}`, 'camera.detect', { object: obj }),
-    doNode(`close the gripper on it`, 'arm.grasp', { object: obj }),
+    doNode(`navigate to ${PLACES[from].label}`, 'navigation.navigate', { goal: from }),
+    doNode(`locate ${OBJECTS[obj].label} in the scene graph`, 'scene.get_object_context', { object: obj }),
+    doNode('move the end effector to it', 'arm.pos_command', { object: obj }),
+    doNode('close the gripper', 'arm.joint_command', { name: 'gripper_finger_joint', position: '0.0' }),
   ]);
 }
 
@@ -48,8 +54,8 @@ function fetch(obj: ObjectId, from: PlaceId): RtdlNode {
 function carry(obj: ObjectId, from: PlaceId, to: PlaceId): RtdlNode {
   return seq(`move ${OBJECTS[obj].label} to ${PLACES[to].label}`, [
     fetch(obj, from),
-    doNode(`carry it to ${PLACES[to].label}`, 'chassis.move', { target: to }),
-    doNode(`put it down`, 'arm.release', { target: to }),
+    doNode(`carry it to ${PLACES[to].label}`, 'navigation.navigate', { goal: to }),
+    doNode('open the gripper', 'arm.joint_command', { name: 'gripper_finger_joint', position: '0.045' }),
   ]);
 }
 
@@ -61,7 +67,7 @@ function whereIs(snap: WorldSnapshot, obj: ObjectId): PlaceId {
   return (p && p !== 'held' ? p : OBJECTS[obj].home) as PlaceId;
 }
 
-const say = (text: string) => doNode(`say “${text}”`, 'speaker.say', { text });
+const say = (text: string) => doNode(`say “${text}”`, 'speech.speak', { text });
 
 /**
  * 自然语言 → RTDL。规则匹配，覆盖演示需要的几类家务。
@@ -106,7 +112,7 @@ export function planLocally(task: string, snap: WorldSnapshot): RtdlEnvelope | n
     const r = RECIPES[dish];
     const steps: RtdlNode[] = [say(`Cooking ${r.label}. Getting the ingredients.`)];
     for (const ing of r.needs) steps.push(carry(ing, whereIs(snap, ing), 'stove'));
-    steps.push(doNode(`cook ${r.label} on the stove`, 'stove.cook', { dish }));
+    steps.push(doNode(`cook ${r.label}`, 'kitchen.cook', { dish }));
     steps.push(carry('plate', whereIs(snap, 'plate'), 'table'));
     steps.push(say(`${r.label} is ready. It's on the table.`));
     return env(
@@ -145,7 +151,7 @@ export function planLocally(task: string, snap: WorldSnapshot): RtdlEnvelope | n
     const steps = [
       say('I will wash up.'),
       carry('plate', whereIs(snap, 'plate'), 'sink'),
-      doNode('run the tap and wash', 'sink.wash'),
+      doNode('run the tap', 'kitchen.wash'),
       carry('plate', 'sink', 'shelf'),
       say('Dishes done.'),
     ];
@@ -159,9 +165,9 @@ export function planLocally(task: string, snap: WorldSnapshot): RtdlEnvelope | n
     const at = whereIs(snap, 'plant');
     return env("I'll water the plant.", 'water the plant',
       seq('water the plant', [
-        doNode(`drive to ${PLACES[at].label}`, 'chassis.move', { target: at }),
-        doNode('look at the plant', 'camera.detect', { object: 'plant' }),
-        doNode('water it', 'watering.water'),
+        doNode(`navigate to ${PLACES[at].label}`, 'navigation.navigate', { goal: at }),
+        doNode('locate the plant', 'scene.get_object_context', { object: 'plant' }),
+        doNode('water it', 'houseplant.water'),
         say('The plant has been watered.'),
       ]),
       'the plant has been watered');

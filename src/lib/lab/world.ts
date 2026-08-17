@@ -590,11 +590,14 @@ export class LabWorld {
     this.events.onAction?.(null);
   }
 
-  /** 检测：眨眼，命中则在物体下画一个转动的圈 */
-  async detect(obj: ObjectId): Promise<boolean> {
-    this.events.onAction?.(`looking for ${OBJECTS[obj].label}`);
+  /**
+   * 语义地图查到某个物体时的可视化：眨眼 + 在物体下画个转动的圈。
+   * 注意这**不是** camera primitive —— 标准契约里相机只负责取帧
+   * （camera/snapshot），识别和定位属于 system/scene 服务。
+   */
+  async highlight(obj: ObjectId): Promise<boolean> {
+    this.events.onAction?.(`locating ${OBJECTS[obj].label}`);
     sfx.detect();
-    // 「在看」的提示：眼睛缩一下
     await this.tween(260, (t) => {
       const k = 1 - Math.sin(t * Math.PI) * 0.7;
       for (const e of this.eyes) e.scale.set(1, k, 1);
@@ -602,11 +605,7 @@ export class LabWorld {
     for (const e of this.eyes) e.scale.set(1, 1, 1);
 
     const o = this.objects.get(obj);
-    const place = this.placeOf.get(obj);
-    if (!o || place === 'held' || place !== this.nearestPlace()) {
-      this.events.onAction?.(null);
-      return false;
-    }
+    if (!o) { this.events.onAction?.(null); return false; }
 
     if (this.marker) this.scene.remove(this.marker);
     const ring = new THREE.Mesh(
@@ -614,26 +613,41 @@ export class LabWorld {
       new THREE.MeshBasicMaterial({ color: C.accent, side: THREE.DoubleSide }),
     );
     ring.rotation.x = -Math.PI / 2;
-    ring.position.set(o.position.x, o.position.y - OBJECTS[obj].rest + 0.005, o.position.z);
+    const wp = new THREE.Vector3();
+    o.getWorldPosition(wp);
+    ring.position.set(wp.x, wp.y - OBJECTS[obj].rest + 0.005, wp.z);
     this.scene.add(ring);
     this.marker = ring;
 
     this.events.onDetect?.(obj);
-    await this.tween(280, () => {});
+    await this.tween(240, () => {});
     this.events.onAction?.(null);
     return true;
   }
 
-  /** 抓取：伸手、合爪、抬起 */
-  async grasp(obj: ObjectId): Promise<boolean> {
+  /**
+   * robonix/primitive/arm/pos_command —— 末端移到某个物体上方。
+   * 够不着（不在同一地点）就失败，不去假装。
+   */
+  async reachFor(obj: ObjectId): Promise<boolean> {
+    if (this.placeOf.get(obj) !== this.nearestPlace()) return false;
+    this.events.onAction?.(`reaching for ${OBJECTS[obj].label}`);
+    await this.tween(400, (t) => { this.armPivot.rotation.x = -0.45 + t * 1.4; });
+    this.events.onAction?.(null);
+    return true;
+  }
+
+  /**
+   * robonix/primitive/arm/joint_command，夹爪关节合拢 —— 抓住。
+   * 前提是末端已经到位（reachFor 成功过）。
+   */
+  async closeGripper(obj: ObjectId): Promise<boolean> {
     const o = this.objects.get(obj);
     if (!o || this.held) return false;
     if (this.placeOf.get(obj) !== this.nearestPlace()) return false;
 
-    this.events.onAction?.(`picking up ${OBJECTS[obj].label}`);
+    this.events.onAction?.(`closing the gripper on ${OBJECTS[obj].label}`);
     sfx.grasp();
-
-    await this.tween(420, (t) => { this.armPivot.rotation.x = -0.4 + t * 1.35; });
     this.gripper.add(o);
     o.position.set(0, -0.12, 0);
     // 拿在手里的东西自己要看得见，所以留在图层 0
@@ -646,15 +660,18 @@ export class LabWorld {
     return true;
   }
 
-  /** 放下：伸手、松爪、物体落到台面 */
-  async release(target: PlaceId): Promise<boolean> {
-    if (!this.held) return false;
+  /**
+   * 夹爪张开 —— 松手，物体落到机器人当前所在地点的台面上。
+   * 返回放下的是什么，没拿东西返回 null。
+   */
+  async openGripper(): Promise<ObjectId | null> {
+    if (!this.held) return null;
     const obj = this.held;
     const o = this.objects.get(obj)!;
+    const target = this.nearestPlace();
 
-    this.events.onAction?.(`putting ${OBJECTS[obj].label} on ${PLACES[target].label}`);
+    this.events.onAction?.(`releasing ${OBJECTS[obj].label} onto ${PLACES[target].label}`);
     sfx.release();
-
     await this.tween(360, (t) => { this.armPivot.rotation.x = -0.05 + t * 1.0; });
     this.scene.add(o);
     o.traverse((c) => c.layers.set(0));
@@ -665,9 +682,19 @@ export class LabWorld {
       await this.tween(280, (t) => { this.lid.rotation.z = -t * 0.85; this.lid.position.x = 3.0 - t * 0.13; });
       await this.tween(280, (t) => { this.lid.rotation.z = -0.85 + t * 0.85; this.lid.position.x = 2.87 + t * 0.13; });
     }
-    await this.tween(320, (t) => { this.armPivot.rotation.x = 0.95 - t * 1.35; });
+    await this.tween(320, (t) => { this.armPivot.rotation.x = 0.95 - t * 1.4; });
     this.events.onAction?.(null);
-    return true;
+    return obj;
+  }
+
+  /** robonix/primitive/arm/end_pose */
+  endPose() {
+    const wp = new THREE.Vector3();
+    this.gripper.getWorldPosition(wp);
+    return {
+      position: { x: +wp.x.toFixed(3), y: +wp.y.toFixed(3), z: +wp.z.toFixed(3) },
+      holding: this.held,
+    };
   }
 
   /** 说话：气泡由上层显示，这里只做点头 */

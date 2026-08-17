@@ -7,6 +7,7 @@
  * pilot / executor —— 连不上时才退回本地兜底，页面永远不会是死屏。
  */
 import Base from '@/layouts/Base.astro';
+import { PROVENANCE as P } from '@/lib/lab/provenance';
 ---
 
 <Base
@@ -18,7 +19,7 @@ import Base from '@/layouts/Base.astro';
     The browser is the robot's <b>body</b> — it provides the chassis, arm, camera and
     speaker as <a href="https://github.com/syswonder/robonix">Robonix</a> capabilities.
     Planning and execution belong to the runtime; this page shows you the plan tree it
-    produces and runs. Ask for a chore in plain English.
+    produces and runs. Ask it to do a chore — any language works.
   </p>
 
   <div class="lab" id="lab">
@@ -66,27 +67,94 @@ import Base from '@/layouts/Base.astro';
     <h2>How it works</h2>
     <div class="prose">
       <p>
-        Robonix organises everything as capabilities, in three layers — the same split
-        its packages use (<code>primitive-*-rbnx</code>, <code>service-*-rbnx</code>,
-        <code>skill-*-rbnx</code>). This page implements the <b>primitive</b> layer:
-        <code>chassis.move</code>, <code>arm.grasp</code>, <code>arm.release</code>,
-        <code>camera.detect</code>, <code>camera.snapshot</code>,
-        <code>speaker.say</code>. Each one is an animation that resolves when the motion
-        finishes, which is how the executor knows a step is done.
+        Robonix exposes everything as <b>capabilities</b>, identified by contract IDs.
+        This page provides capabilities across all four layers, using the contract names
+        that actually exist in the repository:
+      </p>
+      <ul>
+        <li>
+          <b>primitive</b> — hardware. <code>chassis/move</code>,
+          <code>arm/pos_command</code>, <code>arm/joint_command</code>,
+          <code>arm/end_pose</code>, <code>camera/snapshot</code>,
+          <code>audio/speaker</code>. Here the browser <em>is</em> the hardware: each one
+          is an animation that resolves when the motion finishes, which is how the
+          executor learns a step is done.
+        </li>
+        <li>
+          <b>service</b> — shared infrastructure. <code>navigation/navigate</code> plans a
+          collision-free path (A* over an occupancy grid built from the furniture) and
+          then drives; <code>speech/speak</code> talks.
+        </li>
+        <li>
+          <b>system</b> — <code>scene/list_objects</code>,
+          <code>scene/get_object_context</code>, <code>scene/get_robot_context</code>.
+          The semantic map. Finding something is a scene query, not a camera call — the
+          camera contract only returns frames.
+        </li>
+        <li>
+          <b>skill</b> — deployment-specific behaviour, the one layer where custom
+          contracts are legitimate: <code>kitchen/cook</code>, <code>kitchen/wash</code>,
+          <code>houseplant/water</code>.
+        </li>
+      </ul>
+      <p>
+        Note there is no <code>grasp</code> primitive, because Robonix doesn't define one.
+        The gripper is a named joint, so picking something up is four steps —
+        navigate, locate it in the scene graph, move the end effector, close
+        <code>gripper_finger_joint</code>. Composing that is exactly what a skill is for.
       </p>
       <p>
         A plan is an <b>RTDL</b> tree — Robot Task Description Language, the format the
         pilot asks the model for. Only three node types exist: <code>sequence</code>
         (ordered, fail-fast), <code>parallel</code> (concurrent, a failing branch doesn't
-        cancel its siblings), and <code>do</code> (call one capability). The tree above
-        updates live as the executor walks it.
+        cancel its siblings), and <code>do</code> (call one capability). The tree updates
+        live as it is walked.
       </p>
       <p>
         The model only ever <em>proposes</em> a tree. Capability names and arguments are
         checked against the catalog, and preconditions are checked before anything moves —
-        ask the robot to grab something it hasn't looked at and watch the step go red.
+        ask it to close the gripper on nothing and the step goes red with the reason.
       </p>
     </div>
+  </section>
+
+  <section class="section">
+    <h2>What's actually running</h2>
+    <div class="prose">
+      <p>
+        Demos like this are easy to be vague about, so here is the exact provenance.
+      </p>
+    </div>
+    <dl class="prov">
+      <div>
+        <dt>Robonix</dt>
+        <dd>
+          <a href={P.robonix.repo}>{P.robonix.version}</a>
+          <span class="prov-dim">{P.robonix.commit} · {P.robonix.date}</span>
+        </dd>
+      </div>
+      <div>
+        <dt>Components</dt>
+        <dd>{P.components.join(' · ')}</dd>
+      </div>
+      <div>
+        <dt>Host</dt>
+        <dd>{P.host.name} <span class="prov-dim">{P.host.arch}</span></dd>
+      </div>
+      <div>
+        <dt>OS</dt>
+        <dd>{P.host.distro} <span class="prov-dim">kernel {P.host.kernel}</span></dd>
+      </div>
+      <div>
+        <dt>Toolchain</dt>
+        <dd>rustc {P.host.rustc} <span class="prov-dim">· python {P.host.python}</span></dd>
+      </div>
+      <div>
+        <dt>Browser</dt>
+        <dd>{P.browserRole}</dd>
+      </div>
+    </dl>
+    <p class="prov-note" id="prov-note"></p>
   </section>
 </Base>
 
@@ -159,9 +227,19 @@ import Base from '@/layouts/Base.astro';
     let busy = false;
     let env: RtdlEnvelope | null = null;
 
-    // 真运行时还没接上时的标注 —— 不假装
+    /*
+      如实标注当前模式。连不上真运行时就说连不上 ——
+      演示里最不该做的事就是让人以为跑的是真的。
+    */
     modeEl.textContent = 'local fallback';
-    modeEl.title = 'The Robonix runtime is not connected; planning and execution are running in the browser.';
+    modeEl.title = 'The Robonix runtime is not reachable from this page yet; planning and execution are running in the browser.';
+    const provNote = document.getElementById('prov-note');
+    if (provNote) {
+      provNote.textContent =
+        'The runtime is installed and built on that host. This page is not yet wired to it — '
+        + 'planning and execution currently run in the browser as a fallback, which is why the '
+        + 'plan panel is labelled “local fallback”.';
+    }
 
     /* --------------------------------------------------------- 语音
        GLaDOS 的真实音色有版权、也没有公开可用的 TTS 模型，
@@ -494,8 +572,36 @@ import Base from '@/layouts/Base.astro';
   }
 
   /* ---- 窄屏 ---- */
+  /* ---- 运行来源 ---- */
+  .prov {
+    margin: 0;
+    max-width: var(--w-prose);
+    font-size: var(--fs-sm);
+  }
+  .prov > div {
+    display: grid;
+    grid-template-columns: 7.5rem 1fr;
+    gap: var(--sp-3);
+    padding: var(--sp-2) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .prov > div:last-child { border-bottom: 0; }
+  .prov dt { color: var(--text-muted); }
+  .prov dd { margin: 0; font-family: var(--font-mono); color: var(--text); overflow-wrap: anywhere; }
+  .prov-dim { color: var(--text-faint); }
+  .prov-note {
+    max-width: var(--w-prose);
+    margin: var(--sp-4) 0 0;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    line-height: var(--lh-base);
+  }
+
   @media (max-width: 60rem) {
     .lab-panels { grid-template-columns: minmax(0, 1fr); gap: var(--sp-5); }
+  }
+  @media (max-width: 34rem) {
+    .prov > div { grid-template-columns: 1fr; gap: 2px; }
   }
   @media (max-width: 34rem) {
     .lab-ask { flex-wrap: wrap; }
