@@ -17,6 +17,7 @@ pnpm preview   # 本地预览构建产物
 |---|---|
 | 站点标题、副标题、描述、域名 | `src/config.ts` → `site` |
 | 导航栏条目 | `src/config.ts` → `nav` |
+| **界面文案**（按钮、区块标题、提示语） | `src/i18n/ui.ts` |
 | **备案号**（ICP / 公安） | `src/config.ts` → `beian` |
 | 头像、首页大图、OG 图、favicon | `src/config.ts` → `images`（文件放 `public/img/`） |
 | 页脚鸣谢、访问统计开关 | `src/config.ts` → `footerCredits` / `analytics` |
@@ -28,6 +29,29 @@ pnpm preview   # 本地预览构建产物
 | **个人简介、教育、论文、开源贡献** | `src/data/profile.ts` |
 
 配色和字体全部走 CSS 变量，`tokens.css` 改一个值全站生效。亮色 / 暗色是同一组变量名的两套取值，不会漏改。
+
+## 双语
+
+英文是默认语言，不带前缀；中文走 `/zh/`：
+
+```
+/            /blog/           /open-source/        英文
+/zh/         /zh/blog/        /zh/open-source/     中文
+```
+
+页头右侧有语言切换按钮，会跳到当前页面的另一语言版本。
+`hreflang` 和 sitemap 都配好了，搜索引擎知道这两个 URL 是同一页。
+
+- **界面文案**（导航、区块标题、按钮）在 `src/i18n/ui.ts`，一个 key 两种语言。
+- **个人资料**（bio、项目描述、教育经历）在 `src/data/profile.ts`，
+  写成 `{ en: ..., zh: ... }` 的字段都是双语的。
+- **专有名词不翻译** —— 人名、项目名、会议名、上游补丁标题保持原文。
+- **博客正文不翻译**。写的是哪种语言就标哪种，front-matter 里 `lang: zh`（默认）
+  或 `lang: en`，渲染时打在 `<article lang>` 上，浏览器才会用对断行规则和字体。
+  界面语言和正文语言可以不同 —— 英文界面读中文文章是常态。
+
+页面主体都在 `src/views/`，`src/pages/` 下只是几行路由壳子。
+加一个新页面要在 `src/pages/` 和 `src/pages/zh/` 各放一个壳子。
 
 ## 写新文章
 
@@ -46,6 +70,8 @@ tags:
   - Operating Systems
   - Rust
 description: 列表页和分享卡片用的一句话摘要，可省略
+lang: zh            # 正文语言，默认 zh
+featured: false     # true 则在列表里加粗，用来给读者指路
 draft: false        # true 则不出现在列表 / RSS / sitemap
 ---
 ```

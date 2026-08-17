@@ -1,6 +1,10 @@
 ---
 import { site, beian, footerCredits, analytics } from '../config';
+import { getLangFromUrl } from '../i18n';
+import { useTranslations } from '../i18n/ui';
 
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
 const year = new Date().getFullYear();
 ---
 
@@ -8,39 +12,34 @@ const year = new Date().getFullYear();
   {analytics.busuanzi && (
     <div class="footer-row" id="busuanzi-stats" hidden>
       <span id="busuanzi_container_site_pv">
-        Visits <span id="busuanzi_value_site_pv"></span>
+        {t('footer.visits')} <span id="busuanzi_value_site_pv"></span>
       </span>
       <span class="sep">·</span>
       <span id="busuanzi_container_site_uv">
-        Visitors <span id="busuanzi_value_site_uv"></span>
+        {t('footer.visitors')} <span id="busuanzi_value_site_uv"></span>
       </span>
     </div>
   )}
 
   {footerCredits.length > 0 && (
     <div class="footer-row">
-      Hosted with thanks to{' '}
+      {t('footer.thanks')}{' '}
       {footerCredits.map((c, i) => (
         <>
-          {i > 0 && (i === footerCredits.length - 1 ? ' and ' : ', ')}
+          {i > 0 && (i === footerCredits.length - 1 ? t('footer.and') : '、')}
           <a href={c.href} target="_blank" rel="noopener">{c.label}</a>
         </>
       ))}
+      {t('footer.thanksTail')}
     </div>
   )}
 
-  <div class="footer-row">
-    © {year} {site.author}
-  </div>
+  <div class="footer-row">© {year} {site.author}</div>
 
   {(beian.icp || beian.police) && (
     <div class="footer-beian">
-      {beian.icp && (
-        <a href={beian.icpUrl} target="_blank" rel="noopener">{beian.icp}</a>
-      )}
-      {beian.police && (
-        <a href={beian.policeUrl} target="_blank" rel="noopener">{beian.police}</a>
-      )}
+      {beian.icp && <a href={beian.icpUrl} target="_blank" rel="noopener">{beian.icp}</a>}
+      {beian.police && <a href={beian.policeUrl} target="_blank" rel="noopener">{beian.police}</a>}
     </div>
   )}
 </footer>
@@ -51,7 +50,8 @@ const year = new Date().getFullYear();
 
 {analytics.busuanzi && (
   <script is:inline>
-    // 统计脚本是第三方且经常挂，拿到数才显示这一行，避免页脚常年空着两个占位符
+    // 统计脚本是第三方且经常挂，拿到数才显示这一行，
+    // 免得页脚常年挂着两个空占位符
     (function () {
       var tries = 0;
       var timer = setInterval(function () {

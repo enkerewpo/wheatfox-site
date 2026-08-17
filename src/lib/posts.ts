@@ -1,4 +1,5 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
+import { localizePath, type Lang } from '../i18n';
 
 export type Post = CollectionEntry<'posts'>;
 
@@ -8,9 +9,13 @@ export async function getPosts(): Promise<Post[]> {
   return posts.sort((a, b) => b.data.date.getTime() - a.data.date.getTime());
 }
 
-/** 文章 URL。permalink 规则改这里，全站跟着变。 */
-export function postUrl(post: Post): string {
-  return `/blog/${post.id}/`;
+/**
+ * 文章 URL。permalink 规则改这里，全站跟着变。
+ * 文章正文不翻译，但链接要留在读者当前的语言版本里，
+ * 这样页头页脚和导航不会突然跳回英文。
+ */
+export function postUrl(post: Post, lang: Lang): string {
+  return localizePath(`/blog/${post.id}/`, lang);
 }
 
 /** 统计每个 tag 下的文章数，按数量倒序、同数量按字母序。 */
@@ -32,7 +37,7 @@ export function tagSlug(tag: string): string {
   return encodeURIComponent(tag.toLowerCase().replace(/[\s/]+/g, '-'));
 }
 
-/** 按年份分组，用于归档页。 */
+/** 按年份分组，用于博客索引。 */
 export function groupByYear(posts: Post[]): { year: number; posts: Post[] }[] {
   const groups = new Map<number, Post[]>();
   for (const post of posts) {
@@ -45,7 +50,11 @@ export function groupByYear(posts: Post[]): { year: number; posts: Post[] }[] {
     .sort((a, b) => b.year - a.year);
 }
 
-/** 统一的日期格式，全站一致。 */
+/**
+ * 统一的日期格式，全站一致。
+ * 用 ISO 风格（2026-01-13）而不是本地化月份名 —— 中英文页面看起来一样，
+ * 也不会出现 "1月" / "January" 在同一个列表里混排。
+ */
 export function formatDate(date: Date, style: 'long' | 'short' = 'long'): string {
   return date.toLocaleDateString('en-CA', {
     timeZone: 'Asia/Shanghai',

@@ -1,13 +1,15 @@
 ---
+import { getLangFromUrl } from '../i18n';
 import { postUrl, formatDate, type Post } from '../lib/posts';
 
 interface Props {
   posts: Post[];
-  /** 'long' = 2026-01-13，'short' = 01-13（归档页按年分组时用短的） */
+  /** 'long' = 2026-01-13，'short' = 01-13（按年分组时用短的） */
   dateStyle?: 'long' | 'short';
 }
 
 const { posts, dateStyle = 'long' } = Astro.props;
+const lang = getLangFromUrl(Astro.url);
 ---
 
 <ul class="post-list">
@@ -16,7 +18,17 @@ const { posts, dateStyle = 'long' } = Astro.props;
       <time datetime={post.data.date.toISOString()}>
         {formatDate(post.data.date, dateStyle)}
       </time>
-      <a class="post-link" href={postUrl(post)}>{post.data.title}</a>
+      {/*
+        lang 属性让浏览器对中文标题用正确的断行规则和字体回落。
+        featured 的加粗样式在 base.css 里。
+      */}
+      <a
+        class:list={['post-link', { featured: post.data.featured }]}
+        href={postUrl(post, lang)}
+        lang={post.data.lang}
+      >
+        {post.data.title}
+      </a>
     </li>
   ))}
 </ul>

@@ -201,6 +201,16 @@ hr {
   font-size: var(--fs-base);
   line-height: var(--lh-snug);
 }
+/*
+  featured 文章加粗 —— 借 research.swtch.com 的 "favorites in bold"。
+  不用单开 "start here" 页面，就能在长列表里给读者指路。
+  在文章 front-matter 里写 featured: true 即可。
+*/
+.post-item .post-link.featured {
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
+}
+
 .post-item .post-link:hover {
   color: var(--accent-hover);
   text-decoration: underline;

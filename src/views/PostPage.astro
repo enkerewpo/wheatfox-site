@@ -1,0 +1,127 @@
+---
+import { render } from 'astro:content';
+import Base from '../layouts/Base.astro';
+import { getLangFromUrl, localizePath, HTML_LANG } from '../i18n';
+import { useTranslations } from '../i18n/ui';
+import { postUrl, formatDate, tagSlug, type Post } from '../lib/posts';
+
+interface Props {
+  post: Post;
+  newer: Post | null;
+  older: Post | null;
+}
+
+const { post, newer, older } = Astro.props;
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+
+const { Content, headings } = await render(post);
+
+// 没写 description 就截取正文开头当摘要
+const excerpt =
+  post.data.description ??
+  post.body
+    ?.replace(/^---[\s\S]*?---/, '')
+    .replace(/[#>*`_\[\]!]|\(https?:[^)]*\)/g, '')
+    .trim()
+    .slice(0, 160)
+    .replace(/\s+\S*$/, '') + '…';
+
+// 只给有 3 个以上二三级标题的长文显示目录
+const toc = headings.filter((h) => h.depth === 2 || h.depth === 3);
+const showToc = toc.length >= 3;
+---
+
+<Base title={post.data.title} description={excerpt} ogType="article" publishedAt={post.data.date}>
+  {/*
+    正文语言可能和界面语言不同（界面英文、文章中文是常态）。
+    在 article 上标 lang，浏览器才会用对断行规则和字体回落。
+  */}
+  <article lang={HTML_LANG[post.data.lang]}>
+    <header class="post-header">
+      <h1>{post.data.title}</h1>
+      <div class="post-meta">
+        <time datetime={post.data.date.toISOString()}>{formatDate(post.data.date)}</time>
+        {post.data.updated && (
+          <>
+            <span class="sep">·</span>
+            <span>{t('post.updated')} {formatDate(post.data.updated)}</span>
+          </>
+        )}
+      </div>
+      {post.data.tags.length > 0 && (
+        <div class="tag-row post-tags">
+          {post.data.tags.map((tag) => (
+            <a class="tag" href={localizePath(`/tags/${tagSlug(tag)}/`, lang)}>{tag}</a>
+          ))}
+        </div>
+      )}
+    </header>
+
+    {showToc && (
+      <nav class="toc" aria-label={t('post.contents')}>
+        <p class="eyebrow">{t('post.contents')}</p>
+        <ol>
+          {toc.map((h) => (
+            <li data-depth={h.depth}><a href={`#${h.slug}`}>{h.text}</a></li>
+          ))}
+        </ol>
+      </nav>
+    )}
+
+    <div class="prose">
+      <Content />
+    </div>
+  </article>
+
+  <nav class="post-nav" aria-label={t('post.adjacent')}>
+    {older ? (
+      <a class="nav-prev" href={postUrl(older, lang)}>← {older.data.title}</a>
+    ) : <span />}
+    {newer && <a class="nav-next" href={postUrl(newer, lang)}>{newer.data.title} →</a>}
+  </nav>
+</Base>
+
+<style>
+  .post-header {
+    max-width: var(--w-prose);
+    margin-bottom: var(--sp-6);
+    padding-bottom: var(--sp-4);
+    border-bottom: 1px solid var(--border);
+  }
+  .post-header h1 {
+    font-family: var(--font-serif);
+    font-size: var(--fs-h1);
+    font-weight: var(--fw-semibold);
+    line-height: var(--lh-tight);
+    letter-spacing: var(--ls-tight);
+    color: var(--text-strong);
+    margin: 0 0 var(--sp-3);
+    overflow-wrap: break-word;
+  }
+  .post-meta {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    font-variant-numeric: tabular-nums;
+  }
+  .post-meta .sep { margin: 0 var(--sp-2); color: var(--border-strong); }
+  .post-tags { margin-top: var(--sp-3); }
+
+  .toc {
+    max-width: var(--w-prose);
+    margin: 0 0 var(--sp-6);
+    padding: var(--sp-4);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+  }
+  .toc ol {
+    list-style: none; margin: 0; padding: 0;
+    font-size: var(--fs-sm); line-height: var(--lh-snug);
+  }
+  .toc li { margin-bottom: var(--sp-2); }
+  .toc li:last-child { margin-bottom: 0; }
+  .toc li[data-depth='3'] { padding-left: var(--sp-4); }
+  .toc a { color: var(--text-muted); }
+  .toc a:hover { color: var(--accent-hover); }
+</style>

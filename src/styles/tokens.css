@@ -123,7 +123,8 @@
   --fs-xs:   0.75rem;   /* 12px  最小：页脚、角标 */
   --fs-sm:   0.8125rem; /* 13px  tag、日期 */
   --fs-base: 0.9375rem; /* 15px  UI 正文 */
-  --fs-prose:1.0625rem; /* 17px  文章正文，serif 需要略大 */
+  --fs-prose:1.125rem;  /* 18px  文章正文。做过排版的站都在 18-20px：
+                           gwern 20px、colah 18px；16px 是下限不是目标 */
   --fs-lg:   1.1875rem; /* 19px  引言 */
   --fs-h3:   1.25rem;   /* 20px */
   --fs-h2:   1.5rem;    /* 24px */
@@ -163,7 +164,8 @@
   --sp-9: 6rem;
 
   /* 内容宽度 */
-  --w-prose: 42rem;   /* 672px，约 70 字符，长文最佳阅读宽度 */
+  --w-prose: 44rem;   /* 704px，18px 下约 78 字符。样本中位数 80-100 字符：
+                         regehr 650px、lilianweng 720px、karpathy 740px */
   --w-page:  52rem;   /* 832px，页面主容器（沿用旧站 840px 的手感） */
   --w-wide:  64rem;   /* 1024px，需要更宽的表格/图片时 */
 

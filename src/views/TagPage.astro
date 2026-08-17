@@ -1,0 +1,45 @@
+---
+import Base from '../layouts/Base.astro';
+import PostList from '../components/PostList.astro';
+import { getLangFromUrl, localizePath } from '../i18n';
+import { useTranslations } from '../i18n/ui';
+import type { Post } from '../lib/posts';
+
+interface Props {
+  tag: string;
+  posts: Post[];
+}
+
+const { tag, posts } = Astro.props;
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+
+const count = posts.length === 1
+  ? t('tags.postCountOne')
+  : t('tags.postCount', { n: posts.length });
+---
+
+<Base title={`${t('tags.title')}: ${tag}`} description={`${count} — ${tag}`}>
+  <p class="crumb"><a href={localizePath('/tags/', lang)}>{t('tags.allTags')}</a></p>
+  <h1 class="page-title">{tag}</h1>
+  <p class="page-lede">{count}</p>
+
+  <PostList posts={posts} />
+</Base>
+
+<style>
+  .crumb { font-size: var(--fs-sm); margin: 0 0 var(--sp-4); }
+  .crumb a { color: var(--text-muted); }
+  .crumb a:hover { color: var(--accent-hover); }
+
+  .page-title {
+    font-family: var(--font-serif);
+    font-size: var(--fs-h1);
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--ls-tight);
+    color: var(--text-strong);
+    margin: 0 0 var(--sp-2);
+    overflow-wrap: break-word;
+  }
+  .page-lede { color: var(--text-muted); font-size: var(--fs-sm); margin: 0 0 var(--sp-6); }
+</style>

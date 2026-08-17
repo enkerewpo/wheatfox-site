@@ -1,0 +1,68 @@
+---
+import Base from '../layouts/Base.astro';
+import { getLangFromUrl, localizePath } from '../i18n';
+import { useTranslations } from '../i18n/ui';
+import { getTags, tagSlug } from '../lib/posts';
+
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
+const tags = await getTags();
+---
+
+<Base title={t('tags.title')} description={t('tags.lede', { n: tags.length })}>
+  <h1 class="page-title">{t('tags.title')}</h1>
+  <p class="page-lede">{t('tags.lede', { n: tags.length })}</p>
+
+  <ul class="tag-cloud">
+    {tags.map(({ tag, count }) => (
+      <li>
+        <a href={localizePath(`/tags/${tagSlug(tag)}/`, lang)}>
+          {tag}<span class="count">{count}</span>
+        </a>
+      </li>
+    ))}
+  </ul>
+</Base>
+
+<style>
+  .page-title {
+    font-family: var(--font-serif);
+    font-size: var(--fs-h1);
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--ls-tight);
+    color: var(--text-strong);
+    margin: 0 0 var(--sp-2);
+  }
+  .page-lede {
+    color: var(--text-muted);
+    font-size: var(--fs-sm);
+    margin: 0 0 var(--sp-6);
+  }
+
+  .tag-cloud {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2);
+  }
+  .tag-cloud a {
+    display: inline-flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    font-size: var(--fs-sm);
+    color: var(--text);
+    background: var(--bg-subtle);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-1) var(--sp-3);
+    transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease);
+  }
+  .tag-cloud a:hover { color: var(--accent-hover); border-color: var(--accent); }
+  .tag-cloud .count {
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+  }
+</style>

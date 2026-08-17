@@ -1,5 +1,7 @@
 ---
 import { site, images } from '../config';
+import { getLangFromUrl, pick, HTML_LANG, LANGS, DEFAULT_LANG, stripLangPrefix, localizePath } from '../i18n';
+import { useTranslations } from '../i18n/ui';
 import Header from '../components/Header.astro';
 import Footer from '../components/Footer.astro';
 
@@ -19,30 +21,41 @@ interface Props {
   description?: string;
   /** OG type，文章页传 'article' */
   ogType?: 'website' | 'article';
-  /** 文章页传发布时间，用于 OG 和 JSON-LD */
+  /** 文章页传发布时间 */
   publishedAt?: Date;
   /** 覆盖默认 OG 图 */
   ogImage?: string;
-  /** 是否在正文区外自己控制宽度 */
-  wide?: boolean;
 }
+
+const lang = getLangFromUrl(Astro.url);
+const t = useTranslations(lang);
 
 const {
   title,
-  description = site.description,
+  description = pick(site.description, lang),
   ogType = 'website',
   publishedAt,
   ogImage = images.ogImage,
-  wide = false,
 } = Astro.props;
 
-const pageTitle = title ? `${title} — ${site.title}` : `${site.title} — ${site.subtitle}`;
-const canonical = new URL(Astro.url.pathname, Astro.site ?? site.url).href;
-const ogImageUrl = new URL(ogImage, Astro.site ?? site.url).href;
+const pageTitle = title
+  ? `${title} — ${site.title}`
+  : `${site.title} — ${pick(site.subtitle, lang)}`;
+
+const base = Astro.site ?? new URL(site.url);
+const canonical = new URL(Astro.url.pathname, base).href;
+const ogImageUrl = new URL(ogImage, base).href;
+
+/** 同一页面的其它语言版本，给 hreflang 用 */
+const bare = stripLangPrefix(Astro.url.pathname);
+const alternates = LANGS.map((l) => ({
+  lang: l,
+  href: new URL(localizePath(bare, l), base).href,
+}));
 ---
 
 <!doctype html>
-<html lang={site.lang}>
+<html lang={HTML_LANG[lang]}>
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -51,9 +64,24 @@ const ogImageUrl = new URL(ogImage, Astro.site ?? site.url).href;
     <meta name="author" content={site.author} />
     <link rel="canonical" href={canonical} />
 
+    {/* 告诉搜索引擎这两个 URL 是同一页的不同语言版本 */}
+    {alternates.map((a) => (
+      <link rel="alternate" hreflang={HTML_LANG[a.lang]} href={a.href} />
+    ))}
+    <link
+      rel="alternate"
+      hreflang="x-default"
+      href={new URL(localizePath(bare, DEFAULT_LANG), base).href}
+    />
+
     <link rel="icon" href={images.favicon} />
     <link rel="apple-touch-icon" href={images.appleTouchIcon} />
-    <link rel="alternate" type="application/rss+xml" title={site.title} href="/rss.xml" />
+    <link
+      rel="alternate"
+      type="application/rss+xml"
+      title={site.title}
+      href={localizePath('/rss.xml', lang)}
+    />
     <link rel="sitemap" href="/sitemap-index.xml" />
 
     <meta property="og:type" content={ogType} />
@@ -62,17 +90,17 @@ const ogImageUrl = new URL(ogImage, Astro.site ?? site.url).href;
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={ogImageUrl} />
     <meta property="og:site_name" content={site.title} />
+    <meta property="og:locale" content={lang === 'zh' ? 'zh_CN' : 'en_US'} />
     {publishedAt && (
       <meta property="article:published_time" content={publishedAt.toISOString()} />
     )}
     <meta name="twitter:card" content="summary_large_image" />
 
-    {/* KaTeX 样式，只在有公式时才真正生效，体积很小 */}
     <link rel="stylesheet" href="/katex/katex.min.css" />
 
     {/*
       主题初始化必须在首次绘制前同步执行，否则暗色用户会看到一帧白闪。
-      逻辑：localStorage 里存过就用存的，没存过就跟随系统。
+      存过就用存的，没存过就跟随系统。
     */}
     <script is:inline>
       (function () {
@@ -82,7 +110,7 @@ const ogImageUrl = new URL(ogImage, Astro.site ?? site.url).href;
             document.documentElement.setAttribute('data-theme', saved);
           }
         } catch (e) {
-          /* 隐私模式下 localStorage 会抛异常，忽略即可，回落到系统偏好 */
+          /* 隐私模式下 localStorage 会抛异常，忽略，回落到系统偏好 */
         }
       })();
     </script>
@@ -90,11 +118,11 @@ const ogImageUrl = new URL(ogImage, Astro.site ?? site.url).href;
 
   <body>
     <div class="layout">
-      <a class="skip-link" href="#main">Skip to content</a>
+      <a class="skip-link" href="#main">{t('a11y.skipToContent')}</a>
       <div class="page">
         <Header />
       </div>
-      <main id="main" class="page" data-wide={wide ? '' : undefined}>
+      <main id="main" class="page">
         <slot />
       </main>
       <div class="page">

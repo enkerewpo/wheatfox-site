@@ -24,6 +24,18 @@ const posts = defineCollection({
       .transform((v) => (v === undefined ? [] : Array.isArray(v) ? v : [v])),
     /** 列表页和 OG 用的摘要；省略则自动取正文开头 */
     description: z.string().optional(),
+    /**
+     * 正文语言。文章不做翻译 —— 写的是哪种语言就标哪种，
+     * 渲染时打在 <article lang> 上，让浏览器用对断行和字体。
+     * 默认中文，因为博客正文以中文为主。
+     */
+    lang: z.enum(['zh', 'en']).default('zh'),
+    /**
+     * 标成 true 会在列表里加粗显示。
+     * 借 research.swtch.com 的「favorites in bold」做法 ——
+     * 不用单开一个 "start here" 页面就能给读者指路。
+     */
+    featured: z.boolean().default(false),
     /** true 时不出现在列表、归档、RSS、sitemap 里 */
     draft: z.boolean().default(false),
   }),
