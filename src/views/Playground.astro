@@ -242,35 +242,40 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
     }
 
     /* --------------------------------------------------------- 语音
-       GLaDOS 的真实音色有版权、也没有公开可用的 TTS 模型，
-       所以这里是**风格近似**：挑一个偏合成感的女声，压低音高、放慢语速、
-       句读拉长，配合台词的冷淡语气。不是她本人，但那个味道在。 */
+       目标是「听得清、略有个性」，不是机器腔。
+       之前 pitch 0.55 / rate 0.82 压得太狠，听着发闷、发怪。
+       现在只做很轻的偏移：略低一点点、略慢一点点，剩下交给音色本身。 */
     let voice: SpeechSynthesisVoice | null = null;
     function pickVoice() {
       const vs = speechSynthesis.getVoices();
-      // 优先挑听起来更「合成」的那几个，而不是最自然的
-      const prefer = [
-        /Zarvox|Trinoids|Whisper/i,        // macOS 里明显机械感的
-        /Microsoft Zira|Google UK English Female/i,
-        /en-GB/i,
+      if (!vs.length) return;
+      // 优先挑发音清楚的高质量声音，避开明显合成腔的那几个
+      const good = vs.filter((v) => /^en(-|_|$)/i.test(v.lang));
+      const preferred = [
+        /Samantha|Karen|Serena|Moira|Tessa/i,          // macOS 里清晰自然的
+        /Google US English|Google UK English/i,
+        /Microsoft (Aria|Jenny|Libby|Sonia)/i,
       ];
-      for (const re of prefer) {
-        const hit = vs.find((v) => re.test(v.name) || re.test(v.lang));
+      for (const re of preferred) {
+        const hit = good.find((v) => re.test(v.name));
         if (hit) { voice = hit; return; }
       }
-      voice = vs.find((v) => /^en/.test(v.lang)) ?? null;
+      // 退一步：优先本地合成（延迟低），且排除明显的玩具音色
+      voice = good.find((v) => v.localService && !/Zarvox|Trinoids|Bells|Bubbles|Albert|Bad News|Cellos|Jester|Organ|Superstar|Wobble|Whisper/i.test(v.name))
+           ?? good[0] ?? vs[0];
     }
     pickVoice();
     speechSynthesis.addEventListener?.('voiceschanged', pickVoice);
 
     function speak(text: string) {
       try {
+        if (!voice) pickVoice();
         const u = new SpeechSynthesisUtterance(text);
         if (voice) u.voice = voice;
-        // 慢、低、平 —— GLaDOS 的三个特征
-        u.rate = 0.82;
-        u.pitch = 0.55;
-        u.volume = 0.9;
+        // 很轻的偏移，够有个性又不影响听清
+        u.rate = 0.96;
+        u.pitch = 0.92;
+        u.volume = 0.95;
         speechSynthesis.cancel();
         speechSynthesis.speak(u);
       } catch { /* 不支持就只留气泡 */ }
