@@ -13,6 +13,7 @@
 import Base from '@/layouts/Base.astro';
 import { url } from '@/lib/url';
 import Publication from '@/components/Publication.astro';
+import LifePanel from '@/components/LifePanel.astro';
 import { pagination } from '@/config';
 import { getPosts, postUrl, formatDate } from '@/lib/posts';
 import {
@@ -37,6 +38,9 @@ const description = bio[0].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 ---
 
 <Base description={description}>
+  {/* ---------- 生命游戏横幅 ---------- */}
+  <LifePanel />
+
   {/* ---------- Bio ---------- */}
   <section class="bio prose">
     {bio.map((para) => <p set:html={para} />)}
@@ -170,7 +174,9 @@ const description = bio[0].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
 
 <style>
     /* ---------- bio ---------- */
-  .bio { margin-bottom: var(--sp-7); }
+  /* 只有四段，铺满正文列即可 —— 46rem 那个行宽是给长文阅读用的，
+     首页这段短介绍收窄反而和下面的分节线对不齐 */
+  .bio { max-width: none; margin-bottom: var(--sp-7); }
   .bio p:last-child { margin-bottom: 0; }
 
   /* ---------- news ---------- */

@@ -8,7 +8,6 @@
 import { nav, images } from '@/config';
 import { url } from '@/lib/url';
 import { profile, emails, academicIds, socials } from '@/data/profile';
-import LifePanel from '@/components/LifePanel.astro';
 
 const path = Astro.url.pathname;
 function isCurrent(href: string) {
@@ -71,6 +70,9 @@ const primarySocials = socials.slice(0, 2);
         <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
       </svg>
     </button>
+
+    {/* 不提示的话没人会知道有这个终端 */}
+    <p class="term-hint">press <kbd>`</kbd> for a shell</p>
   </div>
 </aside>
 

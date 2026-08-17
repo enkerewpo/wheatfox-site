@@ -14,9 +14,9 @@
 ---
 
 <script>
-  const SIZE = 16;           // favicon 网格边长
-  const SCALE = 4;           // 实际画布 64×64，缩放后边缘更清楚
-  const INTERVAL = 700;      // 每代间隔，慢一点才不烦人
+  const SIZE = 8;            // 8×8 —— 格子大，标签页那么小才看得出在动
+  const SCALE = 8;           // 实际画布 64×64
+  const INTERVAL = 900;      // 每代间隔，慢一点才不烦人
 
   // 尊重系统的减少动效偏好：直接不跑
   if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
@@ -43,9 +43,21 @@
     /** 记录最近几代的指纹，用来发现「死局」和短周期循环 */
     let history: string[] = [];
 
+    /**
+     * 8×8 太小，塞不下脉冲星那类图样，但滑翔机（3×3）正好 ——
+     * 而且在环面上会一直斜着绕圈，永远不会停。
+     * 再随机加一个小振荡器当伴奏。
+     */
     function seed(): Uint8Array {
       const g = new Uint8Array(SIZE * SIZE);
-      for (let i = 0; i < g.length; i++) g[i] = Math.random() < 0.32 ? 1 : 0;
+      const put = (pts: number[][], ox: number, oy: number) => {
+        for (const [dx, dy] of pts) g[((oy + dy + SIZE) % SIZE) * SIZE + ((ox + dx + SIZE) % SIZE)] = 1;
+      };
+      const GLIDER  = [[1,0],[2,1],[0,2],[1,2],[2,2]];
+      const BLINKER = [[0,0],[1,0],[2,0]];
+      const TOAD    = [[1,0],[2,0],[3,0],[0,1],[1,1],[2,1]];
+      put(GLIDER, Math.floor(Math.random() * SIZE), Math.floor(Math.random() * SIZE));
+      put(Math.random() < 0.5 ? BLINKER : TOAD, Math.floor(Math.random() * SIZE), Math.floor(Math.random() * SIZE));
       return g;
     }
 

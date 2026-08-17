@@ -1,12 +1,11 @@
 ---
 /**
- * 侧栏底部一条会动的生命游戏网格。
+ * 首页正文顶上的一条生命游戏横幅。
  *
  * favicon 里那个 16×16 太隐蔽了（谁会盯着标签页看），所以这里放一条
- * 看得见的。刻意用极低的对比度 —— 读成「纹理」而不是「内容」，
- * 不跟正文抢注意力，但站久了会发现它一直在变。
+ * 铺满正文宽度的。对比度压得比较低 —— 是会呼吸的页眉，不是要抢戏的图。
  *
- * 点一下重新播种。
+ * 点 reseed 重新播种。
  */
 ---
 
@@ -16,10 +15,10 @@
 </div>
 
 <script>
-  import { makeGrid, seed, addGlider, step, StallDetector, type Grid } from '@/lib/life';
+  import { makeGrid, seedWithPatterns, step, StallDetector, type Grid } from '@/lib/life';
 
-  const CELL = 4;        // 每格 4 CSS px
-  const INTERVAL = 500;  // 每代间隔
+  const CELL = 6;        // 每格 6 CSS px
+  const INTERVAL = 320;  // 每代间隔
 
   const canvas = document.getElementById('life-canvas') as HTMLCanvasElement | null;
   const btn = document.querySelector<HTMLButtonElement>('.life-reseed');
@@ -36,23 +35,23 @@
     function fit() {
       const dpr = window.devicePixelRatio || 1;
       const cssW = canvas.clientWidth || 240;
-      const cssH = 56;
+      const cssH = 132;   // 高一点，绝对活细胞数才够看
       canvas.width = Math.round(cssW * dpr);
       canvas.height = Math.round(cssH * dpr);
       canvas.style.height = cssH + 'px';
       ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
 
       const w = Math.max(8, Math.floor(cssW / CELL));
-      const h = Math.max(4, Math.floor(cssH / CELL));
-      grid = seed(makeGrid(w, h), 0.3);
-      addGlider(grid, 2, 2);   // 保证一定有个会动的东西
+      const h = Math.max(6, Math.floor(cssH / CELL));
+      // 摆已知图样 + 少量背景噪点。纯随机出来就是一片没意义的雪花。
+      grid = seedWithPatterns(makeGrid(w, h));
       stall.reset();
       draw();
     }
 
     function draw() {
       const cs = getComputedStyle(document.documentElement);
-      const fg = cs.getPropertyValue('--border-strong').trim() || '#aaa';
+      const fg = cs.getPropertyValue('--link').trim() || '#9F8383';
       ctx!.clearRect(0, 0, canvas.width, canvas.height);
       ctx!.fillStyle = fg;
       for (let i = 0; i < grid.cells.length; i++) {
@@ -63,12 +62,33 @@
       }
     }
 
+    /**
+     * Conway 规则下随机汤最终会稳定在 ~3% 存活率，也就是越跑越空。
+     * 想让它一直好看，就得有个种群下限：低于阈值补种。
+     * 补种不是清空重来 —— 在现有局面上再撒一批图样，看着是连续演化。
+     */
+    const FLOOR = 0.055;  // 活细胞占比低于这个就补种
+
+    function population(): number {
+      let n = 0;
+      for (let i = 0; i < grid.cells.length; i++) n += grid.cells[i];
+      return n / grid.cells.length;
+    }
+
     function tick() {
       grid = step(grid);
+
       if (stall.check(grid)) {
-        grid = seed(makeGrid(grid.w, grid.h), 0.3);
-        addGlider(grid, 2, 2);
+        grid = seedWithPatterns(makeGrid(grid.w, grid.h));
+      } else if (population() < FLOOR) {
+        // 在活着的局面上追加图样，保留已有结构
+        const fresh = seedWithPatterns(makeGrid(grid.w, grid.h), { noise: 0.16 });
+        for (let i = 0; i < grid.cells.length; i++) {
+          grid.cells[i] = grid.cells[i] | fresh.cells[i];
+        }
+        stall.reset();
       }
+
       draw();
     }
 
@@ -91,18 +111,23 @@
 
 <style>
   .life {
-    margin-top: var(--sp-5);
-    padding-top: var(--sp-4);
-    border-top: 1px solid var(--border);
+    position: relative;
+    /* 和下面各分节的标题横线同宽（铺满正文列），
+       不要用 --w-prose —— 那是正文行宽，两者对不齐会很难看 */
+    margin: 0 0 var(--sp-6);
+    padding-bottom: var(--sp-3);
+    border-bottom: 1px solid var(--border);
   }
   .life canvas {
     display: block;
     width: 100%;
-    /* 压得很低，是背景纹理不是内容 */
-    opacity: 0.5;
+    /* 压低一些：是会呼吸的页眉，不是插图 */
+    opacity: 0.7;
   }
   .life-reseed {
-    margin-top: var(--sp-2);
+    position: absolute;
+    right: 0;
+    bottom: var(--sp-3);
     padding: 0;
     background: none;
     border: 0;
@@ -110,10 +135,12 @@
     font-size: var(--fs-xs);
     color: var(--text-faint);
     cursor: pointer;
+    opacity: 0;
+    transition: opacity var(--dur) var(--ease);
   }
+  /* 平时藏起来，鼠标移上去才出现，不打扰阅读 */
+  .life:hover .life-reseed,
+  .life-reseed:focus-visible { opacity: 1; }
   .life-reseed:hover { color: var(--link); }
   .life-reseed::before { content: '↻ '; }
-
-  /* 窄屏塌成横条时这块就别占地方了 */
-  @media (max-width: 62rem) { .life { display: none; } }
 </style>
