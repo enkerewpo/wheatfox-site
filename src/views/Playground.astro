@@ -242,43 +242,39 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
     }
 
     /* --------------------------------------------------------- 语音
-       目标是「听得清、略有个性」，不是机器腔。
-       之前 pitch 0.55 / rate 0.82 压得太狠，听着发闷、发怪。
-       现在只做很轻的偏移：略低一点点、略慢一点点，剩下交给音色本身。 */
-    let voice: SpeechSynthesisVoice | null = null;
-    function pickVoice() {
+       用浏览器自带的 TTS，参数保持中性，优先保证**各平台都能出声**。
+
+       跨平台的坑主要是两个，这里都处理了：
+         · Chrome 的 getVoices() 首次是空的，要等 voiceschanged 事件；
+           所以不在启动时锁定音色，而是每次说话时现取。
+         · 各平台音色名字完全不同（Samantha 只有 macOS 有），
+           写死名字在别的系统上就是没有。所以只按语言挑，挑不到就
+           交给浏览器自己决定 —— 那一定是能用的。 */
+    function pickVoice(): SpeechSynthesisVoice | null {
       const vs = speechSynthesis.getVoices();
-      if (!vs.length) return;
-      // 优先挑发音清楚的高质量声音，避开明显合成腔的那几个
-      const good = vs.filter((v) => /^en(-|_|$)/i.test(v.lang));
-      const preferred = [
-        /Samantha|Karen|Serena|Moira|Tessa/i,          // macOS 里清晰自然的
-        /Google US English|Google UK English/i,
-        /Microsoft (Aria|Jenny|Libby|Sonia)/i,
-      ];
-      for (const re of preferred) {
-        const hit = good.find((v) => re.test(v.name));
-        if (hit) { voice = hit; return; }
-      }
-      // 退一步：优先本地合成（延迟低），且排除明显的玩具音色
-      voice = good.find((v) => v.localService && !/Zarvox|Trinoids|Bells|Bubbles|Albert|Bad News|Cellos|Jester|Organ|Superstar|Wobble|Whisper/i.test(v.name))
-           ?? good[0] ?? vs[0];
+      if (!vs.length) return null;                 // 还没加载好，交给浏览器默认
+      return vs.find((v) => /^en[-_]?US/i.test(v.lang) && v.localService)
+          ?? vs.find((v) => /^en/i.test(v.lang) && v.localService)
+          ?? vs.find((v) => /^en/i.test(v.lang))
+          ?? null;
     }
-    pickVoice();
-    speechSynthesis.addEventListener?.('voiceschanged', pickVoice);
 
     function speak(text: string) {
       try {
-        if (!voice) pickVoice();
+        if (!('speechSynthesis' in window)) return;
         const u = new SpeechSynthesisUtterance(text);
-        if (voice) u.voice = voice;
-        // 很轻的偏移，够有个性又不影响听清
-        u.rate = 0.96;
-        u.pitch = 0.92;
-        u.volume = 0.95;
+        u.lang = 'en-US';
+        const v = pickVoice();
+        if (v) u.voice = v;                        // 挑不到就用浏览器默认，不强求
+        // 中性参数：不做任何风格化，优先听清
+        u.rate = 1;
+        u.pitch = 1;
+        u.volume = 1;
         speechSynthesis.cancel();
         speechSynthesis.speak(u);
-      } catch { /* 不支持就只留气泡 */ }
+      } catch {
+        /* 不支持 TTS 的浏览器：气泡还在，功能不受影响 */
+      }
     }
 
     /* --------------------------------------------------------- 示例 */
