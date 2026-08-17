@@ -77,6 +77,14 @@ export type NewsItem = {
  */
 export const news: NewsItem[] = [
   {
+    date: '2026-08-15',
+    text: 'Robonix was officially released at the <a href="https://chinaosc.ccf.org.cn/">2026 CCF China Open Source Conference</a> in Chongqing, which ran a dedicated forum on embodied AI operating systems.',
+  },
+  {
+    date: '2026-03',
+    text: 'The <a href="https://gitlink.org.cn/zone/uos/source/292">Embodied AI Operating System Technical White Paper</a> was published by the CCF Ubiquitous Operating Systems Open Community. I am one of the authors.',
+  },
+  {
     date: '2026-01',
     text: 'Added LoongArch64 support to <a href="https://github.com/nbdd0121/unwinding">unwinding</a>, the Rust stack-unwinding library.',
   },
@@ -193,12 +201,16 @@ export type Publication = {
  */
 export const publications: Publication[] = [
   {
-    authors: ['CCF Ubiquitous Operating Systems Open Community', 'Yulong Han'],
-    title: 'Embodied AI Operating System Technical White Paper',
+    // 作者顺序照白皮书致谢页原文，跨单位按原文次序排
+    authors: [
+      'Donggang Cao', 'Yulong Han', 'Zhaobo Zhang', 'Guowei Li', 'Xiang Chen',
+      'Zihao Zheng', 'Yao Guo', 'Kang Chen', 'Dongliang Xue', 'Dong Li', 'Litong You',
+    ],
+    title: 'Embodied AI Operating System Technical White Paper (EAIOS)',
     venue: 'CCF Ubiquitous Operating Systems Open Community',
-    year: 2025,
+    year: 2026,
     type: 'report',
-    note: 'Co-author.',
+    note: 'Peking University, Tsinghua University, Shanghai Jiao Tong University, ICT CAS, and Hangzhou Dianzi University. Organised by the Syswonder open-source community.',
     links: [
       { label: 'Document', href: 'https://gitlink.org.cn/zone/uos/source/292' },
     ],
@@ -282,7 +294,7 @@ export const contributions: Contribution[] = [
   {
     project: 'Linux Kernel',
     href: 'https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/',
-    blurb: 'The mainline Linux kernel — LoongArch KVM',
+    blurb: 'The mainline Linux kernel — LoongArch KVM and documentation tooling',
     items: [
       {
         ref: 'PATCH',
@@ -295,6 +307,12 @@ export const contributions: Contribution[] = [
         title: 'LoongArch: KVM: Add tracepoints for CPUCFG and CSR emulation exits',
         href: 'https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=36d09b96d3e79518e2be31fc7960cc694702afb8',
         date: '2025-07-21',
+      },
+      {
+        ref: 'PATCH',
+        title: 'docs: automarkup.py: Skip common English words as C identifiers',
+        href: 'https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=6b8edfcd661b569f077cc1ea1f7463ec38547779',
+        date: '2026-01-25',
       },
     ],
   },

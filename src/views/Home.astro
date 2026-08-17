@@ -108,6 +108,7 @@ const description = bio[0].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
         <Publication pub={pub} index={publications.length - i} />
       ))}
     </ol>
+    <p class="more"><a href="/publications/">All publications →</a></p>
   </section>
 
   {/* ---------- 近期文章 ---------- */}
@@ -180,7 +181,8 @@ const description = bio[0].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
   }
   .news li {
     display: grid;
-    grid-template-columns: 5rem 1fr;
+    /* 放得下 YYYY-MM-DD，不然长日期会被折行 */
+    grid-template-columns: 6.5rem 1fr;
     gap: var(--sp-3);
     padding: var(--sp-2) 0;
     font-size: var(--fs-base);
@@ -191,6 +193,7 @@ const description = bio[0].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
     font-size: var(--fs-sm);
     color: var(--text-faint);
     font-variant-numeric: tabular-nums;
+    white-space: nowrap;
   }
   .news-more { margin-top: var(--sp-3); }
   .news-more summary {

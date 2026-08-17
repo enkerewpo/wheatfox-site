@@ -73,22 +73,58 @@ const primarySocials = socials.slice(0, 2);
 </aside>
 
 <script>
-  // 点击切换 light/dark，并记住选择。
-  // 没点过的用户不写 localStorage，始终跟随系统。
-  const btn = document.querySelector<HTMLButtonElement>('.theme-toggle');
-  const root = document.documentElement;
+  /**
+   * 主题以**系统偏好为准**。
+   * 手动点击只是临时覆盖，1 小时后过期，自动回到跟随系统 ——
+   * 沿用旧 Hexo 主题的行为，免得某次误点之后永远跟不上系统了。
+   */
+  const KEY = 'theme';
+  const KEY_AT = 'theme-set-at';
+  const TTL = 60 * 60 * 1000; // 1 小时
 
-  function currentTheme(): 'light' | 'dark' {
-    const attr = root.getAttribute('data-theme');
-    if (attr === 'light' || attr === 'dark') return attr;
-    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  const root = document.documentElement;
+  const media = window.matchMedia('(prefers-color-scheme: dark)');
+
+  function systemTheme(): 'light' | 'dark' {
+    return media.matches ? 'dark' : 'light';
   }
 
-  btn?.addEventListener('click', () => {
-    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+  /** 手动设置还在有效期内就返回它，否则清掉并返回 null */
+  function validOverride(): 'light' | 'dark' | null {
+    try {
+      const theme = localStorage.getItem(KEY);
+      const at = Number(localStorage.getItem(KEY_AT));
+      if ((theme === 'light' || theme === 'dark') && at && Date.now() - at < TTL) {
+        return theme;
+      }
+      localStorage.removeItem(KEY);
+      localStorage.removeItem(KEY_AT);
+    } catch {
+      /* 隐私模式：读不到就当没有 */
+    }
+    return null;
+  }
+
+  function apply() {
+    root.setAttribute('data-theme', validOverride() ?? systemTheme());
+  }
+
+  apply();
+
+  // 系统主题变了：没有有效的手动覆盖就立刻跟上
+  media.addEventListener('change', () => {
+    if (!validOverride()) apply();
+  });
+
+  // 覆盖过期后自动回到系统主题，不用刷新页面
+  setInterval(apply, 60 * 1000);
+
+  document.querySelector<HTMLButtonElement>('.theme-toggle')?.addEventListener('click', () => {
+    const next = (root.getAttribute('data-theme') === 'dark' ? 'light' : 'dark');
     root.setAttribute('data-theme', next);
     try {
-      localStorage.setItem('theme', next);
+      localStorage.setItem(KEY, next);
+      localStorage.setItem(KEY_AT, String(Date.now()));
     } catch {
       /* 隐私模式，切换只在本次会话生效 */
     }

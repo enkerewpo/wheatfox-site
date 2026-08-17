@@ -81,15 +81,23 @@ const ogImageUrl = new URL(ogImage, base).href;
       存过就用存的，没存过就跟随系统。
     */}
     <script is:inline>
+      // 首屏同步执行，避免暗色用户看到一帧白闪。
+      // 规则和 Sidebar.astro 里一致：系统偏好优先，手动覆盖 1 小时后失效。
       (function () {
+        var theme = null;
         try {
           var saved = localStorage.getItem('theme');
-          if (saved === 'light' || saved === 'dark') {
-            document.documentElement.setAttribute('data-theme', saved);
+          var at = Number(localStorage.getItem('theme-set-at'));
+          if ((saved === 'light' || saved === 'dark') && at && Date.now() - at < 3600000) {
+            theme = saved;
           }
         } catch (e) {
-          /* 隐私模式下 localStorage 会抛异常，忽略，回落到系统偏好 */
+          /* 隐私模式下 localStorage 会抛异常，忽略 */
         }
+        if (!theme) {
+          theme = window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+        }
+        document.documentElement.setAttribute('data-theme', theme);
       })();
     </script>
   </head>

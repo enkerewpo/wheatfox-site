@@ -1,0 +1,80 @@
+---
+/**
+ * 论文页。
+ * 按年份倒序分组 —— al-folio 和 UNSAT 都是这个做法，也是论文变多之后
+ * 唯一还能扫得动的组织方式。数量少的时候看着空，但不用等以后重排。
+ */
+import Base from '@/layouts/Base.astro';
+import Publication from '@/components/Publication.astro';
+import { academicIds } from '@/data/profile';
+import { publications } from '@/data/profile';
+
+/** 按年份倒序分组 */
+const byYear = [...new Set(publications.map((p) => Number(p.year)))]
+  .sort((a, b) => b - a)
+  .map((year) => ({
+    year,
+    items: publications.filter((p) => Number(p.year) === year),
+  }));
+
+const orcid = academicIds.find((l) => l.label === 'ORCID');
+---
+
+<Base
+  title="Publications"
+  description="Papers, technical reports, and theses by Yulong Han."
+>
+  <h1 class="page-title">Publications</h1>
+  <p class="page-lede">
+    {publications.length} entries.
+    {orcid && (
+      <>
+        A complete record is on <a href={orcid.href} target="_blank" rel="noopener">ORCID</a>.
+      </>
+    )}
+  </p>
+
+  {byYear.map(({ year, items }) => (
+    <section class="year">
+      <h2>{year}</h2>
+      <ol class="pub-list">
+        {items.map((pub) => <Publication pub={pub} />)}
+      </ol>
+    </section>
+  ))}
+</Base>
+
+<style>
+  .page-title {
+    font-family: var(--font-sans);
+    font-size: var(--fs-h1);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--ls-tight);
+    color: var(--text);
+    margin: 0 0 var(--sp-3);
+  }
+  .page-lede {
+    max-width: var(--w-prose);
+    color: var(--text-muted);
+    font-size: var(--fs-base);
+    margin: 0 0 var(--sp-7);
+  }
+
+  .year { margin-bottom: var(--sp-7); }
+  .year h2 {
+    font-family: var(--font-mono);
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
+    color: var(--text);
+    margin: 0 0 var(--sp-2);
+    padding-bottom: var(--sp-2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .pub-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-width: var(--w-prose);
+  }
+</style>

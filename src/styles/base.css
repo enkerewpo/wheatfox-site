@@ -65,7 +65,8 @@ hr {
   width: 100%;
   max-width: var(--w-shell);
   margin: 0 auto;
-  padding: var(--sp-6) var(--sp-5) 0;
+  /* 顶部留白给足，内容不要贴着窗口上沿 */
+  padding: var(--sp-8) var(--sp-5) 0;
   display: grid;
   grid-template-columns: var(--w-sidebar) minmax(0, 1fr);
   gap: var(--w-gutter);
@@ -101,9 +102,9 @@ hr {
    -------------------------------------------------------------------------- */
 .sidebar {
   position: sticky;
-  top: var(--sp-6);
+  top: var(--sp-8);
   /* 自身超高时内部滚动，不跟着页面走 */
-  max-height: calc(100dvh - var(--sp-8));
+  max-height: calc(100dvh - var(--sp-9));
   overflow-y: auto;
   overscroll-behavior: contain;
   scrollbar-width: none;

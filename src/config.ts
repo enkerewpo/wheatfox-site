@@ -21,11 +21,11 @@ export const site = {
 
 /** 侧栏导航。顺序即显示顺序，删掉一行就少一个入口。 */
 export const nav: { label: string; href: string }[] = [
-  { label: 'Home',        href: '/' },
-  { label: 'Blog',        href: '/blog/' },
-  { label: 'Open Source', href: '/open-source/' },
-  { label: 'Tags',        href: '/tags/' },
-  { label: 'RSS',         href: '/rss.xml' },
+  { label: 'Home',         href: '/' },
+  { label: 'Publications', href: '/publications/' },
+  { label: 'Open Source',  href: '/open-source/' },
+  { label: 'Blog',         href: '/blog/' },
+  { label: 'RSS',          href: '/rss.xml' },
 ];
 
 /** 图片资源。放在 public/ 下，改文件名就在这里同步改。 */
