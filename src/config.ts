@@ -31,8 +31,8 @@ export const site = {
  */
 export const nav: { label: string; href: string }[] = [
   { label: 'Home', href: '/' },
-  { label: 'About', href: '/about/' },
-  { label: 'Archive', href: '/archive/' },
+  { label: 'Blog', href: '/blog/' },
+  { label: 'Open Source', href: '/open-source/' },
   { label: 'Tags', href: '/tags/' },
   { label: 'RSS', href: '/rss.xml' },
 ];

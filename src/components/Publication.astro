@@ -1,0 +1,136 @@
+---
+import { profile, type Publication } from '../data/profile';
+
+interface Props {
+  pub: Publication;
+  /** 列表序号，学术站常见的倒序编号 */
+  index?: number;
+}
+
+const { pub, index } = Astro.props;
+
+/** 自己的名字加粗——学术列表的通用做法，方便别人一眼找到你 */
+const isSelf = (author: string) =>
+  author === profile.name || author === profile.handle;
+
+const typeLabel: Record<Publication['type'], string> = {
+  conference: 'Conference',
+  journal: 'Journal',
+  preprint: 'Preprint',
+  thesis: 'Thesis',
+  report: 'Report',
+};
+---
+
+<li class="pub">
+  {index !== undefined && <span class="pub-index">[{index}]</span>}
+
+  <div class="pub-body">
+    <p class="pub-authors">
+      {pub.authors.map((author, i) => (
+        <>
+          {i > 0 && ', '}
+          {isSelf(author) ? <strong>{author}</strong> : author}
+        </>
+      ))}
+    </p>
+
+    <p class="pub-title">{pub.title}</p>
+
+    <p class="pub-venue">
+      <em>{pub.venue}</em>, {pub.year}
+      <span class="pub-type">{typeLabel[pub.type]}</span>
+    </p>
+
+    {pub.note && <p class="pub-note">{pub.note}</p>}
+
+    {pub.links && pub.links.length > 0 && (
+      <p class="pub-links">
+        {pub.links.map((link) => (
+          <a href={link.href} target="_blank" rel="noopener">{link.label}</a>
+        ))}
+      </p>
+    )}
+  </div>
+</li>
+
+<style>
+  .pub {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    gap: var(--sp-3);
+    padding: var(--sp-4) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .pub:last-child { border-bottom: 0; }
+
+  .pub-index {
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
+    color: var(--text-faint);
+    line-height: 1.7;
+    font-variant-numeric: tabular-nums;
+  }
+
+  .pub-body > p { margin: 0 0 var(--sp-1); }
+  .pub-body > p:last-child { margin-bottom: 0; }
+
+  .pub-authors {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+  }
+  .pub-authors strong {
+    color: var(--text-strong);
+    font-weight: var(--fw-semibold);
+  }
+
+  .pub-title {
+    font-family: var(--font-serif);
+    font-size: var(--fs-prose);
+    line-height: var(--lh-snug);
+    color: var(--text-strong);
+    margin-bottom: var(--sp-2) !important;
+  }
+
+  .pub-venue {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+  }
+  .pub-type {
+    display: inline-block;
+    margin-left: var(--sp-2);
+    font-size: var(--fs-xs);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    background: var(--accent-wash);
+    border-radius: var(--radius-sm);
+    padding: 0 var(--sp-2);
+  }
+
+  .pub-note {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    font-style: italic;
+  }
+
+  .pub-links {
+    margin-top: var(--sp-2) !important;
+    display: flex;
+    gap: var(--sp-3);
+  }
+  .pub-links a {
+    font-size: var(--fs-sm);
+    color: var(--accent-strong);
+    border-bottom: 1px solid var(--accent);
+  }
+  .pub-links a:hover {
+    color: var(--accent-hover);
+    border-bottom-color: var(--accent-hover);
+  }
+
+  @media (max-width: 34rem) {
+    .pub { grid-template-columns: 1fr; gap: 0; }
+    .pub-index { display: none; }
+  }
+</style>

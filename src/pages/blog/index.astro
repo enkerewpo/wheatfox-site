@@ -1,16 +1,23 @@
 ---
-import Base from '../layouts/Base.astro';
-import PostList from '../components/PostList.astro';
-import { getPosts, groupByYear } from '../lib/posts';
+/**
+ * 博客索引。
+ * 46 篇这个量级不分页 —— 一页全列出，Ctrl+F 就能找，
+ * 比翻 5 页分页器有用得多。等超过 200 篇再考虑分页。
+ */
+import Base from '../../layouts/Base.astro';
+import PostList from '../../components/PostList.astro';
+import { getPosts, groupByYear } from '../../lib/posts';
 
 const posts = await getPosts();
 const years = groupByYear(posts);
 ---
 
-<Base title="Archive" description="Every post, newest first.">
-  <h1 class="page-title">Archive</h1>
+<Base title="Blog" description="Notes on operating systems, hypervisors, Rust, and whatever else I'm reading.">
+  <h1 class="page-title">Blog</h1>
   <p class="page-lede">
-    {posts.length} posts, {years.length} years.
+    {posts.length} posts across {years.length} years. Mostly operating systems,
+    hypervisors, and paper notes. <a href="/tags/">Browse by tag</a> or
+    <a href="/rss.xml">subscribe</a>.
   </p>
 
   {years.map(({ year, posts }) => (
@@ -28,11 +35,12 @@ const years = groupByYear(posts);
     font-weight: var(--fw-semibold);
     letter-spacing: var(--ls-tight);
     color: var(--text-strong);
-    margin: 0 0 var(--sp-2);
+    margin: 0 0 var(--sp-3);
   }
   .page-lede {
+    max-width: var(--w-prose);
     color: var(--text-muted);
-    font-size: var(--fs-sm);
+    font-size: var(--fs-base);
     margin: 0 0 var(--sp-7);
   }
 

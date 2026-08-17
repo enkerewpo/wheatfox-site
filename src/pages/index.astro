@@ -1,7 +1,416 @@
 ---
+/**
+ * 首页 = 学术主页，不另开 /about。
+ *
+ * 这是学术站的压倒性惯例：al-folio 的首页直接渲染 _pages/about.md，
+ * Emery Berger 首页的 <h1> 就是 "About"，Matt Might 的 About 是指回
+ * 首页的锚点。落地页先给身份和 bio，博客是导航里的次级入口。
+ *
+ * 区块顺序按博士生站的惯例排（Zhuohan Li、Lianmin Zheng）：
+ * Projects 在 Publications 之前 —— 早期研究者的分量在代码里，
+ * 不在还没攒够的论文列表里。
+ */
 import Base from '../layouts/Base.astro';
-import PostList from '../components/PostList.astro';
-import { getPosts } from '../lib/posts';
+import Publication from '../components/Publication.astro';
+import { images } from '../config';
+import { getPosts, postUrl, formatDate } from '../lib/posts';
+import {
+  profile,
+  news,
+  NEWS_ON_HOME,
+  emails,
+  academicIds,
+  socials,
+  education,
+  publications,
+  projects,
+} from '../data/profile';
+
 const posts = await getPosts();
+const recentPosts = posts.slice(0, 5);
+
+const newsShown = news.slice(0, NEWS_ON_HOME);
+const newsRest = news.slice(NEWS_ON_HOME);
 ---
-<Base><h1>stub</h1><PostList posts={posts.slice(0, 5)} /></Base>
+
+<Base description={profile.bio[0].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim()}>
+  {/* ---------- 身份区 ---------- */}
+  <section class="intro">
+    <img
+      class="avatar"
+      src={images.avatar}
+      alt={`Portrait of ${profile.name}`}
+      width="132"
+      height="132"
+      loading="eager"
+    />
+
+    <div class="intro-text">
+      <h1>
+        {profile.name}
+        <span class="handle">{profile.handle}</span>
+      </h1>
+      <p class="role">
+        {profile.role},{' '}
+        <a href={profile.affiliationUrl}>{profile.affiliation}</a>
+      </p>
+
+      <ul class="idlinks">
+        {emails.map((email) => (
+          <li><a href={`mailto:${email}`}>{email}</a></li>
+        ))}
+        {academicIds.map((id) => (
+          <li>
+            <a href={id.href} target="_blank" rel="noopener">
+              {id.label}{id.text && <span class="idtext">{id.text}</span>}
+            </a>
+          </li>
+        ))}
+        {socials.slice(0, 2).map((s) => (
+          <li>
+            <a href={s.href} target="_blank" rel="noopener">
+              {s.label}{s.text && <span class="idtext">{s.text}</span>}
+            </a>
+          </li>
+        ))}
+      </ul>
+    </div>
+  </section>
+
+  {/* ---------- Bio ---------- */}
+  <section class="bio prose">
+    {profile.bio.map((para) => <p set:html={para} />)}
+  </section>
+
+  {/* ---------- 研究方向 ---------- */}
+  <section class="section">
+    <h2>Research Interests</h2>
+    <div class="tag-row">
+      {profile.interests.map((i) => <span class="tag">{i}</span>)}
+    </div>
+  </section>
+
+  {/* ---------- News ---------- */}
+  <section class="section">
+    <h2>News</h2>
+    <ul class="news">
+      {newsShown.map((item) => (
+        <li>
+          <time>{item.date}</time>
+          <span set:html={item.text} />
+        </li>
+      ))}
+    </ul>
+    {newsRest.length > 0 && (
+      <details class="news-more">
+        <summary>{newsRest.length} earlier</summary>
+        <ul class="news">
+          {newsRest.map((item) => (
+            <li>
+              <time>{item.date}</time>
+              <span set:html={item.text} />
+            </li>
+          ))}
+        </ul>
+      </details>
+    )}
+  </section>
+
+  {/* ---------- 项目 ---------- */}
+  <section class="section">
+    <h2>Projects</h2>
+    <ul class="projects">
+      {projects.map((p) => (
+        <li>
+          <div class="proj-head">
+            <a class="proj-name" href={p.href} target="_blank" rel="noopener">{p.name}</a>
+            <span class="proj-role">{p.role}</span>
+            <span class="proj-period">{p.period}</span>
+          </div>
+          <p class="proj-desc">{p.description}</p>
+          {p.tags && (
+            <div class="tag-row">
+              {p.tags.map((t) => <span class="tag">{t}</span>)}
+            </div>
+          )}
+        </li>
+      ))}
+    </ul>
+    <p class="more"><a href="/open-source/">Upstream contributions →</a></p>
+  </section>
+
+  {/* ---------- 论文 ---------- */}
+  <section class="section">
+    <h2>Publications</h2>
+    <ol class="pub-list">
+      {publications.map((pub, i) => (
+        <Publication pub={pub} index={publications.length - i} />
+      ))}
+    </ol>
+  </section>
+
+  {/* ---------- 近期文章 ---------- */}
+  <section class="section">
+    <h2>Recent Writing</h2>
+    <ul class="post-list">
+      {recentPosts.map((post) => (
+        <li class="post-item">
+          <time datetime={post.data.date.toISOString()}>
+            {formatDate(post.data.date)}
+          </time>
+          <a class="post-link" href={postUrl(post)}>{post.data.title}</a>
+        </li>
+      ))}
+    </ul>
+    <p class="more"><a href="/blog/">All {posts.length} posts →</a></p>
+  </section>
+
+  {/* ---------- 教育 ---------- */}
+  <section class="section">
+    <h2>Education</h2>
+    <ul class="education">
+      {education.map((e) => (
+        <li>
+          <time>{e.period}</time>
+          <div>
+            <p class="edu-degree">{e.degree} in {e.field}</p>
+            <p class="edu-school">
+              {e.institutionUrl
+                ? <a href={e.institutionUrl} target="_blank" rel="noopener">{e.institution}</a>
+                : e.institution}
+            </p>
+            {e.note && <p class="edu-note">{e.note}</p>}
+          </div>
+        </li>
+      ))}
+    </ul>
+  </section>
+
+  {/* ---------- 其它链接 ---------- */}
+  <section class="section">
+    <h2>Elsewhere</h2>
+    <ul class="idlinks">
+      {socials.map((s) => (
+        <li>
+          <a href={s.href} target="_blank" rel="noopener">
+            {s.label}{s.text && <span class="idtext">{s.text}</span>}
+          </a>
+        </li>
+      ))}
+    </ul>
+  </section>
+</Base>
+
+<style>
+  /* ---------- 身份区 ---------- */
+  .intro {
+    display: flex;
+    gap: var(--sp-5);
+    align-items: flex-start;
+    margin-bottom: var(--sp-6);
+  }
+  .avatar {
+    width: 132px;
+    height: 132px;
+    border-radius: var(--radius-lg);
+    object-fit: cover;
+    border: 1px solid var(--border);
+    flex-shrink: 0;
+  }
+  .intro-text { min-width: 0; }
+  .intro h1 {
+    font-family: var(--font-serif);
+    font-size: var(--fs-h1);
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--ls-tight);
+    color: var(--text-strong);
+    line-height: var(--lh-tight);
+    margin: 0 0 var(--sp-2);
+  }
+  .intro h1 .handle {
+    font-family: var(--font-mono);
+    font-size: var(--fs-base);
+    font-weight: var(--fw-normal);
+    color: var(--text-faint);
+    margin-left: var(--sp-3);
+    letter-spacing: var(--ls-normal);
+  }
+  .role {
+    font-size: var(--fs-base);
+    color: var(--text-muted);
+    margin: 0 0 var(--sp-3);
+  }
+
+  .idlinks {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-sm);
+  }
+  .idlinks a {
+    color: var(--text-muted);
+    border-bottom: 1px solid var(--border-strong);
+    padding-bottom: 1px;
+  }
+  .idlinks a:hover {
+    color: var(--accent-hover);
+    border-bottom-color: var(--accent);
+  }
+  .idlinks .idtext {
+    color: var(--text-faint);
+    margin-left: var(--sp-2);
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+  }
+
+  @media (max-width: 34rem) {
+    .intro { flex-direction: column; gap: var(--sp-4); }
+    .avatar { width: 96px; height: 96px; }
+    .intro h1 .handle { display: block; margin: var(--sp-1) 0 0; }
+  }
+
+  /* ---------- bio ---------- */
+  .bio { margin-bottom: var(--sp-7); }
+  .bio p:last-child { margin-bottom: 0; }
+
+  /* ---------- news ---------- */
+  .news {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-width: var(--w-prose);
+  }
+  .news li {
+    display: grid;
+    grid-template-columns: 5rem 1fr;
+    gap: var(--sp-3);
+    padding: var(--sp-2) 0;
+    font-size: var(--fs-base);
+    line-height: var(--lh-base);
+  }
+  .news time {
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .news-more { margin-top: var(--sp-3); }
+  .news-more summary {
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    cursor: pointer;
+  }
+  .news-more summary:hover { color: var(--accent-hover); }
+
+  @media (max-width: 34rem) {
+    .news li { grid-template-columns: 1fr; gap: var(--sp-1); }
+  }
+
+  /* ---------- 论文 ---------- */
+  .pub-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-width: var(--w-prose);
+  }
+
+  /* ---------- 项目 ---------- */
+  .projects {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-width: var(--w-prose);
+  }
+  .projects > li {
+    padding: var(--sp-4) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .projects > li:last-child { border-bottom: 0; }
+  .proj-head {
+    display: flex;
+    align-items: baseline;
+    flex-wrap: wrap;
+    gap: var(--sp-2) var(--sp-3);
+    margin-bottom: var(--sp-2);
+  }
+  .proj-name {
+    font-family: var(--font-serif);
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-semibold);
+    color: var(--text-strong);
+  }
+  .proj-name:hover { color: var(--accent-hover); }
+  .proj-role {
+    font-size: var(--fs-xs);
+    letter-spacing: var(--ls-wide);
+    text-transform: uppercase;
+    color: var(--text-faint);
+    background: var(--accent-wash);
+    border-radius: var(--radius-sm);
+    padding: 0 var(--sp-2);
+  }
+  .proj-period {
+    font-size: var(--fs-sm);
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+    margin-left: auto;
+  }
+  .proj-desc {
+    font-family: var(--font-serif);
+    font-size: var(--fs-base);
+    line-height: var(--lh-base);
+    color: var(--text);
+    margin: 0 0 var(--sp-3);
+  }
+
+  /* ---------- 教育 ---------- */
+  .education {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+    max-width: var(--w-prose);
+  }
+  .education li {
+    display: grid;
+    grid-template-columns: 9rem 1fr;
+    gap: var(--sp-3);
+    padding: var(--sp-3) 0;
+    border-bottom: 1px solid var(--border);
+  }
+  .education li:last-child { border-bottom: 0; }
+  .education time {
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
+    color: var(--text-faint);
+    font-variant-numeric: tabular-nums;
+  }
+  .education p { margin: 0; }
+  .edu-degree {
+    font-family: var(--font-serif);
+    font-size: var(--fs-prose);
+    color: var(--text-strong);
+  }
+  .edu-school { font-size: var(--fs-base); color: var(--text-muted); }
+  .edu-note {
+    font-size: var(--fs-sm);
+    color: var(--text-faint);
+    margin-top: var(--sp-1) !important;
+    font-style: italic;
+  }
+
+  @media (max-width: 34rem) {
+    .education li { grid-template-columns: 1fr; gap: var(--sp-1); }
+    .proj-period { margin-left: 0; }
+  }
+
+  /* ---------- 「查看全部」 ---------- */
+  .more {
+    margin: var(--sp-4) 0 0;
+    font-size: var(--fs-sm);
+  }
+  .more a { color: var(--text-muted); }
+  .more a:hover { color: var(--accent-hover); }
+</style>

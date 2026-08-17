@@ -10,7 +10,7 @@ export async function getPosts(): Promise<Post[]> {
 
 /** 文章 URL。permalink 规则改这里，全站跟着变。 */
 export function postUrl(post: Post): string {
-  return `/posts/${post.id}/`;
+  return `/blog/${post.id}/`;
 }
 
 /** 统计每个 tag 下的文章数，按数量倒序、同数量按字母序。 */

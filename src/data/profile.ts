@@ -61,6 +61,47 @@ export const profile = {
 } as const;
 
 /* -------------------------------------------------------------------------- */
+/* News —— 首页时间线，学术站的标配                                              */
+/* -------------------------------------------------------------------------- */
+
+export type NewsItem = {
+  /** YYYY-MM 或 YYYY-MM-DD */
+  date: string;
+  /** 一句话。支持行内 HTML */
+  text: string;
+};
+
+/**
+ * 新的加在最前面。首页只显示前 NEWS_ON_HOME 条，其余折叠。
+ * 这是访客判断你「还活跃吗」的第一眼信息，尽量保持更新。
+ */
+export const news: NewsItem[] = [
+  {
+    date: '2026-01',
+    text: 'Added LoongArch64 support to <a href="https://github.com/nbdd0121/unwinding">unwinding</a>, the Rust stack-unwinding library.',
+  },
+  {
+    date: '2025-12',
+    text: 'Landed <code>/proc/version</code> support in <a href="https://github.com/asterinas/asterinas">Asterinas</a>.',
+  },
+  {
+    date: '2025-07',
+    text: 'Second LoongArch KVM patch merged into the mainline <a href="https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=36d09b96d3e79518e2be31fc7960cc694702afb8">Linux kernel</a> — tracepoints for CPUCFG and CSR emulation exits.',
+  },
+  {
+    date: '2025-04',
+    text: 'First patch merged into the mainline <a href="https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/commit/?id=8b2d01fec800081dd68271c01e4d239ef4d7115e">Linux kernel</a> (LoongArch KVM).',
+  },
+  {
+    date: '2024-09',
+    text: 'Started my PhD at the School of Computer Science, Peking University.',
+  },
+];
+
+/** 首页显示几条 news，其余收进 <details> */
+export const NEWS_ON_HOME = 4;
+
+/* -------------------------------------------------------------------------- */
 /* 联系方式 & 学术档案                                                           */
 /* -------------------------------------------------------------------------- */
 
