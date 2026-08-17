@@ -1,5 +1,5 @@
 ---
-import { profile, type Publication } from '../data/profile';
+import { profile, type Publication } from '@/data/profile';
 
 interface Props {
   pub: Publication;
@@ -39,7 +39,7 @@ const typeLabel: Record<Publication['type'], string> = {
 
     <p class="pub-venue">
       <em>{pub.venue}</em>, {pub.year}
-      <span class="pub-type">{typeLabel[pub.type]}</span>
+ <span class="pub-type">{typeLabel[pub.type]}</span>
     </p>
 
     {pub.note && <p class="pub-note">{pub.note}</p>}
@@ -80,15 +80,15 @@ const typeLabel: Record<Publication['type'], string> = {
     color: var(--text-muted);
   }
   .pub-authors strong {
-    color: var(--text-strong);
+    color: var(--text);
     font-weight: var(--fw-semibold);
   }
 
   .pub-title {
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-size: var(--fs-prose);
     line-height: var(--lh-snug);
-    color: var(--text-strong);
+    color: var(--text);
     margin-bottom: var(--sp-2) !important;
   }
 
@@ -96,17 +96,10 @@ const typeLabel: Record<Publication['type'], string> = {
     font-size: var(--fs-sm);
     color: var(--text-muted);
   }
-  .pub-type {
-    display: inline-block;
-    margin-left: var(--sp-2);
-    font-size: var(--fs-xs);
-    letter-spacing: var(--ls-wide);
-    text-transform: uppercase;
-    color: var(--text-faint);
-    background: var(--accent-wash);
-    border-radius: var(--radius-sm);
-    padding: 0 var(--sp-2);
-  }
+  /* 类型用纯文本括注，不做角标 */
+  .pub-type { color: var(--text-faint); }
+  .pub-type::before { content: '('; }
+  .pub-type::after  { content: ')'; }
 
   .pub-note {
     font-size: var(--fs-sm);
@@ -121,12 +114,12 @@ const typeLabel: Record<Publication['type'], string> = {
   }
   .pub-links a {
     font-size: var(--fs-sm);
-    color: var(--accent-strong);
-    border-bottom: 1px solid var(--accent);
+    color: var(--link);
+    border-bottom: 1px solid var(--link);
   }
   .pub-links a:hover {
-    color: var(--accent-hover);
-    border-bottom-color: var(--accent-hover);
+    color: var(--link-hover);
+    border-bottom-color: var(--link-hover);
   }
 
   @media (max-width: 34rem) {

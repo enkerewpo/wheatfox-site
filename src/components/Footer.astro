@@ -1,10 +1,6 @@
 ---
-import { site, beian, footerCredits, analytics } from '../config';
-import { getLangFromUrl } from '../i18n';
-import { useTranslations } from '../i18n/ui';
+import { site, beian, footerCredits, analytics } from '@/config';
 
-const lang = getLangFromUrl(Astro.url);
-const t = useTranslations(lang);
 const year = new Date().getFullYear();
 ---
 
@@ -12,25 +8,24 @@ const year = new Date().getFullYear();
   {analytics.busuanzi && (
     <div class="footer-row" id="busuanzi-stats" hidden>
       <span id="busuanzi_container_site_pv">
-        {t('footer.visits')} <span id="busuanzi_value_site_pv"></span>
+        Visits <span id="busuanzi_value_site_pv"></span>
       </span>
       <span class="sep">·</span>
       <span id="busuanzi_container_site_uv">
-        {t('footer.visitors')} <span id="busuanzi_value_site_uv"></span>
+        Visitors <span id="busuanzi_value_site_uv"></span>
       </span>
     </div>
   )}
 
   {footerCredits.length > 0 && (
     <div class="footer-row">
-      {t('footer.thanks')}{' '}
+      Hosted with thanks to 
       {footerCredits.map((c, i) => (
         <>
-          {i > 0 && (i === footerCredits.length - 1 ? t('footer.and') : '、')}
+          {i > 0 && (i === footerCredits.length - 1 ? ' and ' : ', ')}
           <a href={c.href} target="_blank" rel="noopener">{c.label}</a>
         </>
       ))}
-      {t('footer.thanksTail')}
     </div>
   )}
 

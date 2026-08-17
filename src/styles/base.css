@@ -31,14 +31,14 @@ body {
 img, svg, video { max-width: 100%; height: auto; display: block; }
 
 a {
-  color: var(--accent-strong);
+  color: var(--link);
   text-decoration: none;
   transition: color var(--dur) var(--ease);
 }
-a:hover { color: var(--accent-hover); }
+a:hover { color: var(--link-hover); }
 
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--link);
   outline-offset: 3px;
   border-radius: var(--radius-sm);
 }
@@ -50,20 +50,37 @@ hr {
 }
 
 /* --------------------------------------------------------------------------
-   布局容器
+   两栏骨架
+   左边身份栏常驻（宽屏下 sticky），右边内容铺开。
+   窄屏塌成单栏，身份栏变成顶部横条。
    -------------------------------------------------------------------------- */
-.page {
-  max-width: var(--w-page);
-  margin: 0 auto;
-  padding: 0 var(--sp-5);
-}
-
 .layout {
   min-height: 100dvh;
   display: flex;
   flex-direction: column;
 }
-.layout > main { flex: 1 0 auto; }
+
+.shell {
+  flex: 1 0 auto;
+  width: 100%;
+  max-width: var(--w-shell);
+  margin: 0 auto;
+  padding: var(--sp-6) var(--sp-5) 0;
+  display: grid;
+  grid-template-columns: var(--w-sidebar) minmax(0, 1fr);
+  gap: var(--w-gutter);
+  align-items: start;
+}
+
+/* 主内容列：minmax(0,1fr) above 保证长代码块不会把网格撑爆 */
+.shell > main { min-width: 0; }
+
+.page-footer {
+  width: 100%;
+  max-width: var(--w-shell);
+  margin: 0 auto;
+  padding: 0 var(--sp-5);
+}
 
 /* 跳到主内容，键盘/读屏用户可见 */
 .skip-link {
@@ -80,79 +97,177 @@ hr {
 .skip-link:focus { left: var(--sp-4); }
 
 /* --------------------------------------------------------------------------
-   页头
+   左侧身份栏
    -------------------------------------------------------------------------- */
-.site-header {
-  display: flex;
-  align-items: baseline;
-  justify-content: space-between;
-  gap: var(--sp-5);
-  flex-wrap: wrap;
-  padding: var(--sp-6) 0 var(--sp-5);
-  border-bottom: 1px solid var(--border);
-  margin-bottom: var(--sp-6);
+.sidebar {
+  position: sticky;
+  top: var(--sp-6);
+  /* 自身超高时内部滚动，不跟着页面走 */
+  max-height: calc(100dvh - var(--sp-8));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+}
+.sidebar::-webkit-scrollbar { display: none; }
+
+.sidebar-portrait { display: block; margin-bottom: var(--sp-4); }
+.sidebar-avatar {
+  width: 100%;
+  max-width: 148px;
+  aspect-ratio: 1;
+  object-fit: cover;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
 }
 
-.wordmark {
-  font-family: var(--font-display);
-  font-size: var(--fs-display);
-  line-height: 1;
-  color: var(--text-strong);
-  letter-spacing: var(--ls-normal);
+.sidebar-name {
+  font-family: var(--font-sans);
+  font-size: var(--fs-h3);
+  font-weight: var(--fw-semibold);
+  color: var(--text);
+  letter-spacing: var(--ls-tight);
+  margin: 0;
+  line-height: var(--lh-tight);
 }
-.wordmark:hover { color: var(--accent-hover); }
-
-.site-tagline {
-  margin-top: var(--sp-1);
+.sidebar-handle {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  color: var(--text-faint);
+  margin: var(--sp-1) 0 var(--sp-3);
+}
+.sidebar-role {
   font-size: var(--fs-sm);
   color: var(--text-muted);
+  line-height: var(--lh-snug);
+  margin: 0 0 var(--sp-4);
 }
 
+/* 边栏里的链接列表：邮箱、ORCID、GitHub */
+.sidebar-links {
+  list-style: none;
+  margin: 0 0 var(--sp-5);
+  padding: 0;
+  font-size: var(--fs-sm);
+  line-height: var(--lh-snug);
+}
+.sidebar-links li { margin-bottom: var(--sp-2); }
+.sidebar-links a {
+  color: var(--text-muted);
+  overflow-wrap: anywhere;
+}
+.sidebar-links a:hover { color: var(--link-hover); }
+.sidebar-links .sub {
+  display: block;
+  color: var(--text-faint);
+  font-size: var(--fs-xs);
+  overflow-wrap: anywhere;
+}
+/* 导航 */
 .site-nav {
+  border-top: 1px solid var(--border);
+  padding-top: var(--sp-4);
   display: flex;
-  align-items: center;
-  gap: var(--sp-4);
-  flex-wrap: wrap;
+  flex-direction: column;
+  gap: var(--sp-2);
+  align-items: flex-start;
 }
 .site-nav a {
   color: var(--text-muted);
   font-size: var(--fs-base);
-  padding-bottom: 2px;
   border-bottom: 1px solid transparent;
 }
-.site-nav a:hover { color: var(--text-strong); }
+.site-nav a:hover { color: var(--text); }
 .site-nav a[aria-current='page'] {
-  color: var(--text-strong);
-  border-bottom-color: var(--accent);
+  color: var(--text);
+  border-bottom-color: var(--link);
 }
 
-/* 主题切换按钮 */
+/* 语言 + 主题开关 */
+.sidebar-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--sp-2);
+  margin-top: var(--sp-4);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border);
+}
+.lang-switch {
+  color: var(--text-muted);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 2px var(--sp-2);
+  font-size: var(--fs-sm);
+}
+.lang-switch:hover { border-color: var(--border-strong); color: var(--text); }
+
 .theme-toggle {
   display: inline-grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 28px;
+  height: 28px;
   padding: 0;
   background: transparent;
   border: 1px solid var(--border);
   border-radius: var(--radius);
   color: var(--text-muted);
   cursor: pointer;
-  transition: color var(--dur) var(--ease),
-              border-color var(--dur) var(--ease);
+  transition: color var(--dur) var(--ease), border-color var(--dur) var(--ease);
 }
-.theme-toggle:hover {
-  color: var(--text-strong);
-  border-color: var(--border-strong);
-}
-.theme-toggle svg { width: 15px; height: 15px; }
-/* 亮色下显示月亮（点了切到暗色），暗色下显示太阳 */
+.theme-toggle:hover { color: var(--text); border-color: var(--border-strong); }
+.theme-toggle svg { width: 14px; height: 14px; }
 .theme-toggle .icon-sun { display: none; }
 :root[data-theme='dark'] .theme-toggle .icon-sun  { display: block; }
 :root[data-theme='dark'] .theme-toggle .icon-moon { display: none; }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) .theme-toggle .icon-sun  { display: block; }
   :root:not([data-theme='light']) .theme-toggle .icon-moon { display: none; }
+}
+
+/* ---- 窄屏：塌成单栏，身份栏变顶部横条 ---- */
+@media (max-width: 62rem) {
+  .shell {
+    grid-template-columns: minmax(0, 1fr);
+    gap: var(--sp-6);
+  }
+  .sidebar {
+    position: static;
+    max-height: none;
+    overflow: visible;
+    padding-bottom: var(--sp-5);
+    border-bottom: 1px solid var(--border);
+    display: grid;
+    grid-template-columns: auto 1fr;
+    grid-template-areas:
+      'avatar ident'
+      'nav    nav';
+    gap: var(--sp-3) var(--sp-4);
+    align-items: center;
+  }
+  .sidebar-portrait { grid-area: avatar; margin-bottom: 0; }
+  .sidebar-avatar { width: 84px; max-width: none; }
+  .sidebar-ident { grid-area: ident; }
+  .sidebar-role { margin-bottom: var(--sp-2); }
+  .sidebar-links { margin-bottom: 0; }
+  .sidebar-nav-wrap {
+    grid-area: nav;
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: var(--sp-3);
+  }
+  .site-nav {
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: var(--sp-4);
+    border-top: 0;
+    padding-top: 0;
+  }
+  .sidebar-controls {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+    margin-left: auto;
+  }
 }
 
 /* --------------------------------------------------------------------------
@@ -167,7 +282,7 @@ hr {
   line-height: var(--lh-snug);
 }
 .site-footer a { color: var(--text-muted); }
-.site-footer a:hover { color: var(--accent-hover); }
+.site-footer a:hover { color: var(--link-hover); }
 .footer-row { margin-bottom: var(--sp-2); }
 .footer-beian {
   display: flex;
@@ -208,14 +323,14 @@ hr {
 */
 .post-item .post-link.featured {
   font-weight: var(--fw-semibold);
-  color: var(--text-strong);
+  color: var(--text);
 }
 
 .post-item .post-link:hover {
-  color: var(--accent-hover);
+  color: var(--link-hover);
   text-decoration: underline;
   text-underline-offset: 3px;
-  text-decoration-color: var(--accent);
+  text-decoration-color: var(--link);
 }
 
 @media (max-width: 34rem) {
@@ -225,33 +340,39 @@ hr {
 /* --------------------------------------------------------------------------
    tag
    -------------------------------------------------------------------------- */
+/*
+  tag 用纯文本 + 间隔点，不做带底色的胶囊。
+  查了 9 个学术站和 9 个技术博客，没有一个用 chip/pill —— 那是产品 UI 的语汇，
+  放在以文字为主的站上会显得很「模板」。
+*/
 .tag {
-  display: inline-block;
-  font-size: var(--fs-xs);
-  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
   color: var(--text-muted);
-  background: var(--accent-wash);
-  border-radius: var(--radius-sm);
-  padding: 1px var(--sp-2);
   white-space: nowrap;
 }
-a.tag:hover { color: var(--accent-hover); }
+a.tag:hover { color: var(--link-hover); text-decoration: underline; text-underline-offset: 2px; }
 
 .tag-row {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--sp-2);
+  gap: 0 var(--sp-3);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+}
+/* 用 · 分隔，比逗号轻，比边框安静 */
+.tag-row > *:not(:last-child)::after {
+  content: '·';
+  color: var(--border-strong);
+  margin-left: var(--sp-3);
 }
 
 /* --------------------------------------------------------------------------
    小标题（全大写标签式，学术页里分区用）
    -------------------------------------------------------------------------- */
 .eyebrow {
-  font-size: var(--fs-xs);
-  font-weight: var(--fw-semibold);
-  letter-spacing: var(--ls-wide);
-  text-transform: uppercase;
-  color: var(--text-faint);
+  font-size: var(--fs-sm);
+  font-weight: var(--fw-medium);
+  color: var(--text-muted);
   margin: 0 0 var(--sp-3);
 }
 
@@ -259,10 +380,10 @@ a.tag:hover { color: var(--accent-hover); }
   margin: var(--sp-7) 0;
 }
 .section > h2 {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: var(--fs-h2);
   font-weight: var(--fw-semibold);
-  color: var(--text-strong);
+  color: var(--text);
   letter-spacing: var(--ls-tight);
   margin: 0 0 var(--sp-4);
   padding-bottom: var(--sp-2);
@@ -282,5 +403,5 @@ a.tag:hover { color: var(--accent-hover); }
   font-size: var(--fs-sm);
 }
 .post-nav a { color: var(--text-muted); max-width: 45%; }
-.post-nav a:hover { color: var(--accent-hover); }
+.post-nav a:hover { color: var(--link-hover); }
 .post-nav .nav-next { text-align: right; margin-left: auto; }

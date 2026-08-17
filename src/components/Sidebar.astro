@@ -1,0 +1,96 @@
+---
+/**
+ * 左侧身份栏 —— 宽屏下常驻（sticky），窄屏塌成顶部横条。
+ *
+ * 身份信息（头像、姓名、职位、邮箱、ORCID）常驻在这里，而不是塞进首页顶部：
+ * 每一页都带着身份，右边内容列也能铺开。al-folio、AcademicPages 都是这个布局。
+ */
+import { nav, images } from '@/config';
+import { profile, emails, academicIds, socials } from '@/data/profile';
+
+const path = Astro.url.pathname;
+function isCurrent(href: string) {
+  if (href === '/') return path === '/';
+  return path === href || path.startsWith(href);
+}
+
+/** 边栏只放最要紧的几个链接，其余在首页的 Elsewhere 区 */
+const primarySocials = socials.slice(0, 2);
+---
+
+<aside class="sidebar">
+  <a class="sidebar-portrait" href="/">
+    <img
+      class="sidebar-avatar"
+      src={images.avatar}
+      alt={`Portrait of ${profile.name}`}
+      width="148"
+      height="148"
+      loading="eager"
+    />
+  </a>
+
+  <div class="sidebar-ident">
+    <p class="sidebar-name">{profile.name}</p>
+    <p class="sidebar-handle">{profile.handle}</p>
+    <p class="sidebar-role">
+      {profile.role}<br />
+      <a href={profile.affiliationUrl}>{profile.affiliation}</a>
+    </p>
+
+    <ul class="sidebar-links">
+      {emails.map((email) => (
+        <li><a href={`mailto:${email}`}>{email}</a></li>
+      ))}
+      {[...academicIds, ...primarySocials].map((l) => (
+        <li>
+          <a href={l.href} target="_blank" rel="noopener">{l.label}</a>
+          {l.text && <span class="sub">{l.text}</span>}
+        </li>
+      ))}
+    </ul>
+  </div>
+
+  <div class="sidebar-nav-wrap">
+    <nav class="site-nav" aria-label="Main">
+      {nav.map((item) => (
+        <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+          {item.label}
+        </a>
+      ))}
+    </nav>
+
+    <button class="theme-toggle" type="button" aria-label="Toggle color theme" title="Toggle color theme">
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+      </svg>
+    </button>
+  </div>
+</aside>
+
+<script>
+  // 点击切换 light/dark，并记住选择。
+  // 没点过的用户不写 localStorage，始终跟随系统。
+  const btn = document.querySelector<HTMLButtonElement>('.theme-toggle');
+  const root = document.documentElement;
+
+  function currentTheme(): 'light' | 'dark' {
+    const attr = root.getAttribute('data-theme');
+    if (attr === 'light' || attr === 'dark') return attr;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  btn?.addEventListener('click', () => {
+    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try {
+      localStorage.setItem('theme', next);
+    } catch {
+      /* 隐私模式，切换只在本次会话生效 */
+    }
+  });
+</script>

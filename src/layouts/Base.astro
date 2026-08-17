@@ -1,16 +1,15 @@
 ---
-import { site, images } from '../config';
-import { getLangFromUrl, pick, HTML_LANG, LANGS, DEFAULT_LANG, stripLangPrefix, localizePath } from '../i18n';
-import { useTranslations } from '../i18n/ui';
-import Header from '../components/Header.astro';
-import Footer from '../components/Footer.astro';
+import { site, images } from '@/config';
+import Sidebar from '@/components/Sidebar.astro';
+import Footer from '@/components/Footer.astro';
 
 // 自托管字体，不走任何第三方 CDN
 import '@fontsource/patrick-hand/400.css';
-import '@fontsource-variable/inter';
-import '@fontsource-variable/source-serif-4';
-import '@fontsource-variable/source-serif-4/wght-italic.css';
-import '@fontsource-variable/jetbrains-mono';
+import '@fontsource/fira-sans/400.css';
+import '@fontsource/fira-sans/500.css';
+import '@fontsource/fira-sans/700.css';
+import '@fontsource/fira-sans/400-italic.css';
+import '@fontsource-variable/source-code-pro';
 
 import '../styles/tokens.css';
 import '../styles/base.css';
@@ -27,35 +26,24 @@ interface Props {
   ogImage?: string;
 }
 
-const lang = getLangFromUrl(Astro.url);
-const t = useTranslations(lang);
-
 const {
   title,
-  description = pick(site.description, lang),
+  description = site.description,
   ogType = 'website',
   publishedAt,
   ogImage = images.ogImage,
 } = Astro.props;
 
-const pageTitle = title
-  ? `${title} — ${site.title}`
-  : `${site.title} — ${pick(site.subtitle, lang)}`;
+const pageTitle = title ? `${title} — ${site.title}` : site.title;
 
 const base = Astro.site ?? new URL(site.url);
 const canonical = new URL(Astro.url.pathname, base).href;
 const ogImageUrl = new URL(ogImage, base).href;
 
-/** 同一页面的其它语言版本，给 hreflang 用 */
-const bare = stripLangPrefix(Astro.url.pathname);
-const alternates = LANGS.map((l) => ({
-  lang: l,
-  href: new URL(localizePath(bare, l), base).href,
-}));
 ---
 
 <!doctype html>
-<html lang={HTML_LANG[lang]}>
+<html lang="en">
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
@@ -64,15 +52,6 @@ const alternates = LANGS.map((l) => ({
     <meta name="author" content={site.author} />
     <link rel="canonical" href={canonical} />
 
-    {/* 告诉搜索引擎这两个 URL 是同一页的不同语言版本 */}
-    {alternates.map((a) => (
-      <link rel="alternate" hreflang={HTML_LANG[a.lang]} href={a.href} />
-    ))}
-    <link
-      rel="alternate"
-      hreflang="x-default"
-      href={new URL(localizePath(bare, DEFAULT_LANG), base).href}
-    />
 
     <link rel="icon" href={images.favicon} />
     <link rel="apple-touch-icon" href={images.appleTouchIcon} />
@@ -80,7 +59,7 @@ const alternates = LANGS.map((l) => ({
       rel="alternate"
       type="application/rss+xml"
       title={site.title}
-      href={localizePath('/rss.xml', lang)}
+      href="/rss.xml"
     />
     <link rel="sitemap" href="/sitemap-index.xml" />
 
@@ -90,7 +69,6 @@ const alternates = LANGS.map((l) => ({
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={ogImageUrl} />
     <meta property="og:site_name" content={site.title} />
-    <meta property="og:locale" content={lang === 'zh' ? 'zh_CN' : 'en_US'} />
     {publishedAt && (
       <meta property="article:published_time" content={publishedAt.toISOString()} />
     )}
@@ -118,14 +96,16 @@ const alternates = LANGS.map((l) => ({
 
   <body>
     <div class="layout">
-      <a class="skip-link" href="#main">{t('a11y.skipToContent')}</a>
-      <div class="page">
-        <Header />
+      <a class="skip-link" href="#main">Skip to content</a>
+
+      <div class="shell">
+        <Sidebar />
+        <main id="main">
+          <slot />
+        </main>
       </div>
-      <main id="main" class="page">
-        <slot />
-      </main>
-      <div class="page">
+
+      <div class="page-footer">
         <Footer />
       </div>
     </div>

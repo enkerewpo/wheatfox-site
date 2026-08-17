@@ -1,44 +1,32 @@
 /* ==========================================================================
-   设计 token —— 全站的颜色 / 字体 / 字号 / 间距 / 圆角都在这一个文件里
+   设计 token —— 全站的颜色 / 字体 / 字号 / 间距都在这一个文件里
    改这里就能整站换皮，不用去翻组件。
    ==========================================================================
 
-   配色沿用旧 Hexo 主题的气质：
-     · 米白纸感底色 #fdfdf5
-     · 灰玫瑰点缀色 #9F8383
-   但把纯黑正文换成暖近黑，链接色加深到无障碍对比度达标，
-   并补齐了 muted / faint / border 等中间层级。
+   配色和字体直接沿用旧 Hexo 主题 polk-x 的取值，不另起炉灶：
+   米白底 #fdfdf5、纯黑正文、灰玫瑰链接 #9F8383、Fira Sans + Source Code Pro。
+   只在旧主题没定义的地方（表头、选中态、边栏）补了几个值，
+   补的也都从旧主题已有的灰阶里取，不引入新色。
 */
 
 /* --------------------------------------------------------------------------
    1. 亮色主题（默认）
    -------------------------------------------------------------------------- */
 :root {
-  /* —— 背景 —— */
-  --bg:            #fdfdf5;  /* 页面底色，米白纸感 */
-  --bg-subtle:     #f6f5ec;  /* 卡片 / 引用块 / 表头 */
-  --bg-code:       #f2f1e6;  /* 行内代码与代码块 */
-  --bg-selection:  #e8ded8;  /* 文本选中 */
+  --bg:            #fdfdf5;  /* 米白纸感底色 */
+  --bg-subtle:     #f7f7f7;  /* 目录块、表头 */
+  --bg-code:       #eee;     /* 行内代码与代码块 */
+  --bg-selection:  #e8ded8;
 
-  /* —— 文字 —— */
-  --text:          #1c1917;  /* 正文，暖近黑（比纯黑更耐读） */
-  --text-strong:   #0d0b0a;  /* 标题 */
-  --text-muted:    #6b665f;  /* 日期、tag、说明文字 */
-  --text-faint:    #94908a;  /* 最弱一级：页脚、序号 */
+  --text:          #000;     /* 正文，纯黑 */
+  --text-muted:    #555;     /* 日期、说明文字 */
+  --text-faint:    #777;     /* 最弱一级：页脚、序号 */
 
-  /* —— 线条 —— */
-  --border:        #e3e0d4;  /* 常规分隔线 */
-  --border-strong: #cfcabb;  /* 强调分隔 / 输入框 */
+  --border:        #ccc;
+  --border-strong: #aaa;
 
-  /* —— 点缀色（灰玫瑰，站点签名色）—— */
-  --accent:        #9F8383;  /* 装饰性：下划线、标记、图标 */
-  --accent-strong: #7a5c5c;  /* 链接文字（对比度达标） */
-  --accent-hover:  #503230;  /* hover / active */
-  --accent-wash:   rgba(159, 131, 131, 0.12); /* 淡背景，如 tag 底色 */
-
-  /* —— 语义色（很少用，主要给 callout）—— */
-  --info:          #4a6b7c;
-  --warn:          #8a6d3b;
+  --link:          #9F8383;  /* 灰玫瑰，站点签名色 */
+  --link-hover:    #503230;
 
   color-scheme: light;
 }
@@ -47,26 +35,20 @@
    2. 暗色主题
    -------------------------------------------------------------------------- */
 :root[data-theme='dark'] {
-  --bg:            #171614;  /* 暖调深灰，呼应米白的暖 */
-  --bg-subtle:     #201e1b;
-  --bg-code:       #211f1c;
+  --bg:            #1a1a1a;
+  --bg-subtle:     #2a2a2a;
+  --bg-code:       #2a2a2a;
   --bg-selection:  #3a322f;
 
-  --text:          #e6e2da;
-  --text-strong:   #f5f2ea;
-  --text-muted:    #a09a90;
-  --text-faint:    #726c63;
+  --text:          #e0e0e0;
+  --text-muted:    #aaa;
+  --text-faint:    #999;
 
-  --border:        #322e29;
-  --border-strong: #46413a;
+  --border:        #444;
+  --border-strong: #555;
 
-  --accent:        #c9a9a9;
-  --accent-strong: #d8bcbc;
-  --accent-hover:  #e7d2d2;
-  --accent-wash:   rgba(201, 169, 169, 0.14);
-
-  --info:          #8fb3c4;
-  --warn:          #c9a86a;
+  --link:          #c9a9a9;
+  --link-hover:    #d4b4b4;
 
   color-scheme: dark;
 }
@@ -74,83 +56,67 @@
 /* 没手动选过主题时跟随系统 */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme='light']) {
-    --bg:            #171614;
-    --bg-subtle:     #201e1b;
-    --bg-code:       #211f1c;
+    --bg:            #1a1a1a;
+    --bg-subtle:     #2a2a2a;
+    --bg-code:       #2a2a2a;
     --bg-selection:  #3a322f;
 
-    --text:          #e6e2da;
-    --text-strong:   #f5f2ea;
-    --text-muted:    #a09a90;
-    --text-faint:    #726c63;
+    --text:          #e0e0e0;
+    --text-muted:    #aaa;
+    --text-faint:    #999;
 
-    --border:        #322e29;
-    --border-strong: #46413a;
+    --border:        #444;
+    --border-strong: #555;
 
-    --accent:        #c9a9a9;
-    --accent-strong: #d8bcbc;
-    --accent-hover:  #e7d2d2;
-    --accent-wash:   rgba(201, 169, 169, 0.14);
-
-    --info:          #8fb3c4;
-    --warn:          #c9a86a;
+    --link:          #c9a9a9;
+    --link-hover:    #d4b4b4;
 
     color-scheme: dark;
   }
 }
 
 /* --------------------------------------------------------------------------
-   3. 字体
+   3. 字体 —— 和旧 Hexo 主题一致
    -------------------------------------------------------------------------- */
 :root {
-  /* wordmark 专用手写体，沿用旧站的 Patrick Hand */
-  --font-display: 'Patrick Hand', 'Bradley Hand', cursive;
+  /* 手写体，只用在 wordmark */
+  --font-display: 'Patrick Hand', cursive;
 
-  /* 界面文字：导航、日期、tag、按钮 */
-  --font-sans: 'Inter Variable', 'Inter', -apple-system, BlinkMacSystemFont,
-    'Segoe UI', Roboto, 'PingFang SC', 'Hiragino Sans GB', 'Microsoft YaHei',
-    sans-serif;
-
-  /* 正文长文阅读：学术站的主力字体 */
-  --font-serif: 'Source Serif 4 Variable', 'Source Serif 4', Georgia,
-    'Songti SC', 'Noto Serif CJK SC', 'Source Han Serif SC', serif;
+  /* 正文和界面，全站主力 */
+  --font-sans: 'Fira Sans', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei',
+    -apple-system, BlinkMacSystemFont, sans-serif;
 
   /* 代码 */
-  --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', ui-monospace,
-    SFMono-Regular, 'SF Mono', Menlo, Consolas, monospace;
+  --font-mono: 'Source Code Pro Variable', 'Source Code Pro', 'SF Mono',
+    ui-monospace, Menlo, Consolas, monospace;
 
-  /* —— 字号（rem，根 16px）—— */
-  --fs-xs:   0.75rem;   /* 12px  最小：页脚、角标 */
-  --fs-sm:   0.8125rem; /* 13px  tag、日期 */
-  --fs-base: 0.9375rem; /* 15px  UI 正文 */
-  --fs-prose:1.125rem;  /* 18px  文章正文。做过排版的站都在 18-20px：
-                           gwern 20px、colah 18px；16px 是下限不是目标 */
-  --fs-lg:   1.1875rem; /* 19px  引言 */
+  /* —— 字号 —— */
+  --fs-xs:   0.8125rem; /* 13px */
+  --fs-sm:   0.875rem;  /* 14px */
+  --fs-base: 1rem;      /* 16px  界面正文 */
+  --fs-prose:1.0625rem; /* 17px  文章正文 */
   --fs-h3:   1.25rem;   /* 20px */
   --fs-h2:   1.5rem;    /* 24px */
-  --fs-h1:   2rem;      /* 32px  文章标题 */
-  --fs-display: 2.5rem; /* 40px  wordmark / 首页大标题 */
+  --fs-h1:   1.875rem;  /* 30px */
+  --fs-display: 2.25rem;/* 36px  wordmark */
 
   /* —— 行高 —— */
   --lh-tight: 1.25;
   --lh-snug:  1.4;
   --lh-base:  1.6;
-  --lh-prose: 1.75;  /* 长文阅读 */
+  --lh-prose: 1.7;
 
-  /* —— 字重（变量字体，可任意取值）—— */
+  /* —— 字重 —— */
   --fw-normal:   400;
   --fw-medium:   500;
   --fw-semibold: 600;
   --fw-bold:     700;
 
-  /* —— 字距 —— */
-  --ls-tight:  -0.02em;
-  --ls-normal: 0;
-  --ls-wide:   0.04em;  /* 全大写小标签 */
+  --ls-tight: -0.01em;
 }
 
 /* --------------------------------------------------------------------------
-   4. 间距 / 尺寸 / 圆角
+   4. 间距 / 布局 / 圆角
    -------------------------------------------------------------------------- */
 :root {
   --sp-1: 0.25rem;
@@ -163,23 +129,21 @@
   --sp-8: 4rem;
   --sp-9: 6rem;
 
-  /* 内容宽度 */
-  --w-prose: 44rem;   /* 704px，18px 下约 78 字符。样本中位数 80-100 字符：
-                         regehr 650px、lilianweng 720px、karpathy 740px */
-  --w-page:  52rem;   /* 832px，页面主容器（沿用旧站 840px 的手感） */
-  --w-wide:  64rem;   /* 1024px，需要更宽的表格/图片时 */
+  /* 两栏：左边身份栏常驻，右边内容铺开 */
+  --w-shell:   76rem;
+  --w-sidebar: 17rem;
+  --w-gutter:  3.5rem;
+
+  /* 正文行宽 */
+  --w-prose: 46rem;
 
   --radius-sm: 3px;
   --radius:    5px;
-  --radius-lg: 10px;
-  --radius-full: 999px;
 
-  /* 过渡 */
   --ease: cubic-bezier(0.4, 0, 0.2, 1);
   --dur:  0.18s;
 }
 
-/* 尊重系统的减少动效偏好 */
 @media (prefers-reduced-motion: reduce) {
   :root { --dur: 0s; }
   *, *::before, *::after {

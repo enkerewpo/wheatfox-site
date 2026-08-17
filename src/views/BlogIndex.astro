@@ -6,28 +6,22 @@
  * danluu 一页塞 198 条只有 22KB，Russ Cox 126 条也是一页。
  * 一页全列出，Ctrl+F 就能找。超过 200 篇再说。
  */
-import Base from '../layouts/Base.astro';
-import PostList from '../components/PostList.astro';
-import { getLangFromUrl, localizePath } from '../i18n';
-import { useTranslations } from '../i18n/ui';
-import { getPosts, groupByYear } from '../lib/posts';
+import Base from '@/layouts/Base.astro';
+import PostList from '@/components/PostList.astro';
+import { getPosts, groupByYear } from '@/lib/posts';
 
-const lang = getLangFromUrl(Astro.url);
-const t = useTranslations(lang);
 
 const posts = await getPosts();
 const years = groupByYear(posts);
 ---
 
-<Base title={t('blog.title')} description={t('blog.lede')}>
-  <h1 class="page-title">{t('blog.title')}</h1>
+<Base title="Blog" description="Notes on operating systems, hypervisors, Rust, and whatever else I'm reading.">
+  <h1 class="page-title">Blog</h1>
   <p class="page-lede">
-    {t('blog.lede')}
+    Notes on operating systems, hypervisors, Rust, and whatever else I'm reading.
     <br />
-    {t('blog.summary', { posts: posts.length, years: years.length })}{' '}
-    <a href={localizePath('/tags/', lang)}>{t('blog.browseByTag')}</a>
-    {lang === 'zh' ? '，或' : ' or '}
-    <a href={localizePath('/rss.xml', lang)}>{t('blog.subscribe')}</a>{lang === 'zh' ? '。' : '.'}
+    {posts.length} posts across {years.length} years.
+    <a href="/tags/">Browse by tag</a> or <a href="/rss.xml">subscribe</a>.
   </p>
 
   {years.map(({ year, posts }) => (
@@ -40,11 +34,11 @@ const years = groupByYear(posts);
 
 <style>
   .page-title {
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-size: var(--fs-h1);
     font-weight: var(--fw-semibold);
     letter-spacing: var(--ls-tight);
-    color: var(--text-strong);
+    color: var(--text);
     margin: 0 0 var(--sp-3);
   }
   .page-lede {
@@ -63,7 +57,7 @@ const years = groupByYear(posts);
     font-family: var(--font-mono);
     font-size: var(--fs-h3);
     font-weight: var(--fw-medium);
-    color: var(--text-strong);
+    color: var(--text);
     margin: 0 0 var(--sp-3);
     padding-bottom: var(--sp-2);
     border-bottom: 1px solid var(--border);

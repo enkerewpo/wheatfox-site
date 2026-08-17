@@ -11,14 +11,11 @@ export default defineConfig({
   site: site.url,
   trailingSlash: 'always',
 
-  // 英文为默认语言且不带前缀（/），中文走 /zh/
-  i18n: {
-    defaultLocale: 'en',
-    locales: ['en', 'zh'],
-    routing: { prefixDefaultLocale: false },
-  },
 
-  integrations: [mdx(), sitemap({ i18n: { defaultLocale: 'en', locales: { en: 'en', zh: 'zh-Hans' } } })],
+  // 截图和预览时不要那个悬浮工具条
+  devToolbar: { enabled: false },
+
+  integrations: [mdx(), sitemap()],
 
   markdown: {
     // $...$ 和 $$...$$ 数学公式，构建期渲染成 KaTeX HTML，运行时零 JS

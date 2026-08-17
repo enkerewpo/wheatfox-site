@@ -1,6 +1,5 @@
 ---
-import { getLangFromUrl } from '../i18n';
-import { postUrl, formatDate, type Post } from '../lib/posts';
+import { postUrl, formatDate, type Post } from '@/lib/posts';
 
 interface Props {
   posts: Post[];
@@ -9,7 +8,6 @@ interface Props {
 }
 
 const { posts, dateStyle = 'long' } = Astro.props;
-const lang = getLangFromUrl(Astro.url);
 ---
 
 <ul class="post-list">
@@ -19,12 +17,12 @@ const lang = getLangFromUrl(Astro.url);
         {formatDate(post.data.date, dateStyle)}
       </time>
       {/*
-        lang 属性让浏览器对中文标题用正确的断行规则和字体回落。
+        文章正文多为中文，lang 属性让浏览器用对断行规则和字体回落。
         featured 的加粗样式在 base.css 里。
       */}
       <a
         class:list={['post-link', { featured: post.data.featured }]}
-        href={postUrl(post, lang)}
+        href={postUrl(post)}
         lang={post.data.lang}
       >
         {post.data.title}

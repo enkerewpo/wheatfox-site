@@ -1,20 +1,15 @@
 ---
-import Base from '../layouts/Base.astro';
-import { getLangFromUrl, localizePath } from '../i18n';
-import { useTranslations } from '../i18n/ui';
+import Base from '@/layouts/Base.astro';
 
-const lang = getLangFromUrl(Astro.url);
-const t = useTranslations(lang);
 ---
 
-<Base title="404" description={t('404.title')}>
+<Base title="404" description="This page does not exist.">
   <div class="notfound">
     <p class="code">404</p>
-    <h1>{t('404.title')}</h1>
+    <h1>This page doesn't exist.</h1>
     <p>
-      {t('404.body')}{' '}
-      {t('404.tryThe')} <a href={localizePath('/blog/', lang)}>{t('404.archive')}</a>{' '}
-      {t('404.orHead')} <a href={localizePath('/', lang)}>{t('404.home')}</a>{lang === 'zh' ? '。' : '.'}
+      It may have moved, or the link may be wrong. Try the
+      <a href="/blog/">archive</a> or head <a href="/">home</a>.
     </p>
   </div>
 </Base>
@@ -23,15 +18,15 @@ const t = useTranslations(lang);
   .notfound { max-width: var(--w-prose); padding: var(--sp-8) 0; }
   .code {
     font-family: var(--font-mono); font-size: var(--fs-sm);
-    color: var(--text-faint); letter-spacing: var(--ls-wide);
+    color: var(--text-faint); letter-spacing: 0;
     margin: 0 0 var(--sp-3);
   }
   .notfound h1 {
-    font-family: var(--font-serif); font-size: var(--fs-h1);
+    font-family: var(--font-sans); font-size: var(--fs-h1);
     font-weight: var(--fw-semibold); letter-spacing: var(--ls-tight);
-    color: var(--text-strong); margin: 0 0 var(--sp-4);
+    color: var(--text); margin: 0 0 var(--sp-4);
   }
   .notfound p:last-child {
-    color: var(--text-muted); font-family: var(--font-serif); font-size: var(--fs-prose);
+    color: var(--text-muted); font-family: var(--font-sans); font-size: var(--fs-prose);
   }
 </style>

@@ -4,7 +4,7 @@
    ========================================================================== */
 
 .prose {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-size: var(--fs-prose);
   line-height: var(--lh-prose);
   color: var(--text);
@@ -17,9 +17,9 @@
 /* —— 标题 —— */
 .prose h1, .prose h2, .prose h3,
 .prose h4, .prose h5, .prose h6 {
-  font-family: var(--font-serif);
+  font-family: var(--font-sans);
   font-weight: var(--fw-semibold);
-  color: var(--text-strong);
+  color: var(--text);
   line-height: var(--lh-tight);
   letter-spacing: var(--ls-tight);
   /* 上边距大、下边距小 —— 标题跟着它统领的内容走 */
@@ -55,15 +55,15 @@
 
 /* —— 正文链接：学术站用下划线，比换色更清楚 —— */
 .prose a {
-  color: var(--accent-strong);
+  color: var(--link);
   text-decoration: underline;
   text-decoration-thickness: 1px;
   text-underline-offset: 0.15em;
-  text-decoration-color: var(--accent);
+  text-decoration-color: var(--link);
 }
 .prose a:hover {
-  color: var(--accent-hover);
-  text-decoration-color: var(--accent-hover);
+  color: var(--link-hover);
+  text-decoration-color: var(--link-hover);
 }
 
 /* —— 列表 —— */
@@ -82,7 +82,7 @@
 .prose blockquote {
   margin: var(--sp-5) 0;
   padding: var(--sp-1) 0 var(--sp-1) var(--sp-5);
-  border-left: 2px solid var(--accent);
+  border-left: 2px solid var(--link);
   color: var(--text-muted);
   font-style: italic;
 }
@@ -158,7 +158,7 @@
 .prose th {
   background: var(--bg-subtle);
   font-weight: var(--fw-semibold);
-  color: var(--text-strong);
+  color: var(--text);
   white-space: nowrap;
 }
 .prose tbody tr:last-child td { border-bottom: 0; }

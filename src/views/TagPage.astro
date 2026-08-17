@@ -1,9 +1,7 @@
 ---
-import Base from '../layouts/Base.astro';
-import PostList from '../components/PostList.astro';
-import { getLangFromUrl, localizePath } from '../i18n';
-import { useTranslations } from '../i18n/ui';
-import type { Post } from '../lib/posts';
+import Base from '@/layouts/Base.astro';
+import PostList from '@/components/PostList.astro';
+import type { Post } from '@/lib/posts';
 
 interface Props {
   tag: string;
@@ -11,16 +9,12 @@ interface Props {
 }
 
 const { tag, posts } = Astro.props;
-const lang = getLangFromUrl(Astro.url);
-const t = useTranslations(lang);
 
-const count = posts.length === 1
-  ? t('tags.postCountOne')
-  : t('tags.postCount', { n: posts.length });
+const count = `${posts.length} post${posts.length === 1 ? '' : 's'}`;
 ---
 
-<Base title={`${t('tags.title')}: ${tag}`} description={`${count} — ${tag}`}>
-  <p class="crumb"><a href={localizePath('/tags/', lang)}>{t('tags.allTags')}</a></p>
+<Base title={`Tag: ${tag}`} description={`${count} tagged “${tag}”.`}>
+  <p class="crumb"><a href={"/tags/"}>← All tags</a></p>
   <h1 class="page-title">{tag}</h1>
   <p class="page-lede">{count}</p>
 
@@ -30,14 +24,14 @@ const count = posts.length === 1
 <style>
   .crumb { font-size: var(--fs-sm); margin: 0 0 var(--sp-4); }
   .crumb a { color: var(--text-muted); }
-  .crumb a:hover { color: var(--accent-hover); }
+  .crumb a:hover { color: var(--link-hover); }
 
   .page-title {
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-size: var(--fs-h1);
     font-weight: var(--fw-semibold);
     letter-spacing: var(--ls-tight);
-    color: var(--text-strong);
+    color: var(--text);
     margin: 0 0 var(--sp-2);
     overflow-wrap: break-word;
   }

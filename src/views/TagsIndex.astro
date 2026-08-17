@@ -1,22 +1,18 @@
 ---
-import Base from '../layouts/Base.astro';
-import { getLangFromUrl, localizePath } from '../i18n';
-import { useTranslations } from '../i18n/ui';
-import { getTags, tagSlug } from '../lib/posts';
+import Base from '@/layouts/Base.astro';
+import { getTags, tagSlug } from '@/lib/posts';
 
-const lang = getLangFromUrl(Astro.url);
-const t = useTranslations(lang);
 const tags = await getTags();
 ---
 
-<Base title={t('tags.title')} description={t('tags.lede', { n: tags.length })}>
-  <h1 class="page-title">{t('tags.title')}</h1>
-  <p class="page-lede">{t('tags.lede', { n: tags.length })}</p>
+<Base title="Tags" description={`${tags.length} tags across the archive.`}>
+  <h1 class="page-title">Tags</h1>
+  <p class="page-lede">{tags.length} tags across the archive.</p>
 
   <ul class="tag-cloud">
     {tags.map(({ tag, count }) => (
       <li>
-        <a href={localizePath(`/tags/${tagSlug(tag)}/`, lang)}>
+        <a href={`/tags/${tagSlug(tag)}/`}>
           {tag}<span class="count">{count}</span>
         </a>
       </li>
@@ -26,11 +22,11 @@ const tags = await getTags();
 
 <style>
   .page-title {
-    font-family: var(--font-serif);
+    font-family: var(--font-sans);
     font-size: var(--fs-h1);
     font-weight: var(--fw-semibold);
     letter-spacing: var(--ls-tight);
-    color: var(--text-strong);
+    color: var(--text);
     margin: 0 0 var(--sp-2);
   }
   .page-lede {
@@ -59,7 +55,7 @@ const tags = await getTags();
     padding: var(--sp-1) var(--sp-3);
     transition: border-color var(--dur) var(--ease), color var(--dur) var(--ease);
   }
-  .tag-cloud a:hover { color: var(--accent-hover); border-color: var(--accent); }
+  .tag-cloud a:hover { color: var(--link-hover); border-color: var(--link); }
   .tag-cloud .count {
     font-size: var(--fs-xs);
     color: var(--text-faint);
