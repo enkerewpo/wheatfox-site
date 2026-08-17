@@ -1,0 +1,53 @@
+---
+import Base from '../../layouts/Base.astro';
+import PostList from '../../components/PostList.astro';
+import { getPosts, getTags, tagSlug } from '../../lib/posts';
+
+export async function getStaticPaths() {
+  const [posts, tags] = await Promise.all([getPosts(), getTags()]);
+  return tags.map(({ tag }) => ({
+    params: { tag: tagSlug(tag) },
+    props: {
+      tag,
+      posts: posts.filter((p) => p.data.tags.includes(tag)),
+    },
+  }));
+}
+
+const { tag, posts } = Astro.props;
+---
+
+<Base
+  title={`Tag: ${tag}`}
+  description={`${posts.length} post${posts.length === 1 ? '' : 's'} tagged “${tag}”.`}
+>
+  <p class="crumb"><a href="/tags/">← All tags</a></p>
+  <h1 class="page-title">{tag}</h1>
+  <p class="page-lede">{posts.length} post{posts.length === 1 ? '' : 's'}</p>
+
+  <PostList posts={posts} />
+</Base>
+
+<style>
+  .crumb {
+    font-size: var(--fs-sm);
+    margin: 0 0 var(--sp-4);
+  }
+  .crumb a { color: var(--text-muted); }
+  .crumb a:hover { color: var(--accent-hover); }
+
+  .page-title {
+    font-family: var(--font-serif);
+    font-size: var(--fs-h1);
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--ls-tight);
+    color: var(--text-strong);
+    margin: 0 0 var(--sp-2);
+    overflow-wrap: break-word;
+  }
+  .page-lede {
+    color: var(--text-muted);
+    font-size: var(--fs-sm);
+    margin: 0 0 var(--sp-6);
+  }
+</style>

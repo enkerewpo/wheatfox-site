@@ -1,0 +1,57 @@
+---
+import Base from '../layouts/Base.astro';
+import PostList from '../components/PostList.astro';
+import { getPosts, groupByYear } from '../lib/posts';
+
+const posts = await getPosts();
+const years = groupByYear(posts);
+---
+
+<Base title="Archive" description="Every post, newest first.">
+  <h1 class="page-title">Archive</h1>
+  <p class="page-lede">
+    {posts.length} posts, {years.length} years.
+  </p>
+
+  {years.map(({ year, posts }) => (
+    <section class="year">
+      <h2>{year}<span class="year-count">{posts.length}</span></h2>
+      <PostList posts={posts} dateStyle="short" />
+    </section>
+  ))}
+</Base>
+
+<style>
+  .page-title {
+    font-family: var(--font-serif);
+    font-size: var(--fs-h1);
+    font-weight: var(--fw-semibold);
+    letter-spacing: var(--ls-tight);
+    color: var(--text-strong);
+    margin: 0 0 var(--sp-2);
+  }
+  .page-lede {
+    color: var(--text-muted);
+    font-size: var(--fs-sm);
+    margin: 0 0 var(--sp-7);
+  }
+
+  .year { margin-bottom: var(--sp-7); }
+  .year h2 {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-3);
+    font-family: var(--font-mono);
+    font-size: var(--fs-h3);
+    font-weight: var(--fw-medium);
+    color: var(--text-strong);
+    margin: 0 0 var(--sp-3);
+    padding-bottom: var(--sp-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .year-count {
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+    font-family: var(--font-sans);
+  }
+</style>

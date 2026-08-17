@@ -1,0 +1,64 @@
+---
+import { site, nav } from '../config';
+
+const path = Astro.url.pathname;
+/** 首页只在完全相等时高亮，其它页按前缀匹配（文章页也高亮 Archive 不合适，故只匹配自身段） */
+function isCurrent(href: string) {
+  if (href === '/') return path === '/';
+  if (href.startsWith('/rss')) return false;
+  return path === href || path.startsWith(href);
+}
+---
+
+<header class="site-header">
+  <div>
+    <a class="wordmark" href="/">{site.title}</a>
+    {site.subtitle && <div class="site-tagline">{site.subtitle}</div>}
+  </div>
+
+  <nav class="site-nav" aria-label="Main">
+    {nav.map((item) => (
+      <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+        {item.label}
+      </a>
+    ))}
+
+    <button
+      class="theme-toggle"
+      type="button"
+      aria-label="Toggle color theme"
+      title="Toggle color theme"
+    >
+      <svg class="icon-moon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12" r="4" />
+        <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41" />
+      </svg>
+    </button>
+  </nav>
+</header>
+
+<script>
+  // 点击切换 light/dark，并记住选择。
+  // 没点过的用户不写 localStorage，始终跟随系统。
+  const btn = document.querySelector<HTMLButtonElement>('.theme-toggle');
+  const root = document.documentElement;
+
+  function currentTheme(): 'light' | 'dark' {
+    const attr = root.getAttribute('data-theme');
+    if (attr === 'light' || attr === 'dark') return attr;
+    return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
+  }
+
+  btn?.addEventListener('click', () => {
+    const next = currentTheme() === 'dark' ? 'light' : 'dark';
+    root.setAttribute('data-theme', next);
+    try {
+      localStorage.setItem('theme', next);
+    } catch {
+      /* 隐私模式，切换只在本次会话生效 */
+    }
+  });
+</script>

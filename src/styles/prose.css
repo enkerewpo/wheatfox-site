@@ -1,0 +1,201 @@
+/* ==========================================================================
+   .prose —— 文章正文排版
+   Markdown 渲染出来的内容都包在 .prose 里。改文章的阅读体验就改这里。
+   ========================================================================== */
+
+.prose {
+  font-family: var(--font-serif);
+  font-size: var(--fs-prose);
+  line-height: var(--lh-prose);
+  color: var(--text);
+  max-width: var(--w-prose);
+}
+
+/* —— 段落 —— */
+.prose p { margin: 0 0 var(--sp-5); }
+
+/* —— 标题 —— */
+.prose h1, .prose h2, .prose h3,
+.prose h4, .prose h5, .prose h6 {
+  font-family: var(--font-serif);
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
+  line-height: var(--lh-tight);
+  letter-spacing: var(--ls-tight);
+  /* 上边距大、下边距小 —— 标题跟着它统领的内容走 */
+  margin: var(--sp-7) 0 var(--sp-3);
+  scroll-margin-top: var(--sp-5);
+}
+.prose h1 { font-size: var(--fs-h1); }
+.prose h2 {
+  font-size: var(--fs-h2);
+  padding-bottom: var(--sp-2);
+  border-bottom: 1px solid var(--border);
+}
+.prose h3 { font-size: var(--fs-h3); }
+.prose h4 { font-size: var(--fs-prose); font-weight: var(--fw-bold); }
+.prose h5, .prose h6 {
+  font-size: var(--fs-base);
+  font-weight: var(--fw-semibold);
+  color: var(--text-muted);
+}
+.prose > :first-child { margin-top: 0; }
+
+/* 标题锚点：hover 时在左侧浮出 # */
+.prose .heading-anchor {
+  color: var(--text-faint);
+  opacity: 0;
+  margin-left: var(--sp-2);
+  font-weight: var(--fw-normal);
+  transition: opacity var(--dur) var(--ease);
+}
+.prose h2:hover .heading-anchor,
+.prose h3:hover .heading-anchor,
+.prose h4:hover .heading-anchor { opacity: 1; }
+
+/* —— 正文链接：学术站用下划线，比换色更清楚 —— */
+.prose a {
+  color: var(--accent-strong);
+  text-decoration: underline;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.15em;
+  text-decoration-color: var(--accent);
+}
+.prose a:hover {
+  color: var(--accent-hover);
+  text-decoration-color: var(--accent-hover);
+}
+
+/* —— 列表 —— */
+.prose ul, .prose ol {
+  margin: 0 0 var(--sp-5);
+  padding-left: var(--sp-5);
+}
+.prose li { margin-bottom: var(--sp-2); }
+.prose li > ul, .prose li > ol {
+  margin-top: var(--sp-2);
+  margin-bottom: 0;
+}
+.prose li::marker { color: var(--text-faint); }
+
+/* —— 引用 —— */
+.prose blockquote {
+  margin: var(--sp-5) 0;
+  padding: var(--sp-1) 0 var(--sp-1) var(--sp-5);
+  border-left: 2px solid var(--accent);
+  color: var(--text-muted);
+  font-style: italic;
+}
+.prose blockquote p:last-child { margin-bottom: 0; }
+
+/* —— 代码 —— */
+.prose code {
+  font-family: var(--font-mono);
+  font-size: 0.875em;
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.35em;
+  font-style: normal;
+  word-break: break-word;
+}
+.prose pre {
+  font-family: var(--font-mono);
+  font-size: var(--fs-sm);
+  line-height: 1.6;
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: var(--sp-4);
+  margin: var(--sp-5) 0;
+  /* 代码块自己横向滚动，绝不把页面撑宽 */
+  overflow-x: auto;
+  /* 长代码块限高，避免一屏全是代码 */
+  max-height: 42rem;
+  overflow-y: auto;
+}
+.prose pre code {
+  background: none;
+  border: 0;
+  padding: 0;
+  font-size: inherit;
+}
+
+/* —— 图片 —— */
+.prose img {
+  margin: var(--sp-5) auto;
+  border-radius: var(--radius);
+  border: 1px solid var(--border);
+  background: var(--bg-subtle);
+}
+.prose figure { margin: var(--sp-6) 0; }
+.prose figcaption {
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+  color: var(--text-muted);
+  text-align: center;
+  margin-top: var(--sp-2);
+}
+
+/* —— 表格：宽表格在自己的容器里滚 —— */
+.prose .table-scroll {
+  overflow-x: auto;
+  margin: var(--sp-5) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.prose table {
+  border-collapse: collapse;
+  width: 100%;
+  font-family: var(--font-sans);
+  font-size: var(--fs-sm);
+}
+.prose th, .prose td {
+  padding: var(--sp-2) var(--sp-3);
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.prose th {
+  background: var(--bg-subtle);
+  font-weight: var(--fw-semibold);
+  color: var(--text-strong);
+  white-space: nowrap;
+}
+.prose tbody tr:last-child td { border-bottom: 0; }
+
+/* —— 数学公式 (KaTeX) —— */
+.prose .katex { font-size: 1.05em; }
+.prose .katex-display {
+  margin: var(--sp-5) 0;
+  /* 长公式横向滚动 */
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: var(--sp-1) 0;
+}
+
+/* —— 脚注 —— */
+.prose .footnotes {
+  margin-top: var(--sp-7);
+  padding-top: var(--sp-4);
+  border-top: 1px solid var(--border);
+  font-size: var(--fs-base);
+  color: var(--text-muted);
+}
+
+/* —— 分隔线 —— */
+.prose hr {
+  margin: var(--sp-7) auto;
+  width: 40%;
+  border-top: 1px solid var(--border-strong);
+}
+
+/* —— 键盘键 —— */
+.prose kbd {
+  font-family: var(--font-mono);
+  font-size: 0.8em;
+  border: 1px solid var(--border-strong);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+  padding: 0.1em 0.4em;
+  background: var(--bg-subtle);
+}
