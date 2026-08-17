@@ -22,6 +22,7 @@ export const site = {
 /** 侧栏导航。顺序即显示顺序，删掉一行就少一个入口。 */
 export const nav: { label: string; href: string }[] = [
   { label: 'Home',         href: '/' },
+  { label: 'Playground',   href: '/playground/' },
   { label: 'Publications', href: '/publications/' },
   { label: 'Open Source',  href: '/open-source/' },
   { label: 'Blog',         href: '/blog/' },

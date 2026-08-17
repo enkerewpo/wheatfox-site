@@ -1,0 +1,508 @@
+---
+/**
+ * Robonix Playground。
+ *
+ * 浏览器在这里是**机器人的身体**：它提供 primitive（底盘、机械臂、相机、
+ * 扬声器），并显示运行时报回来的 RTDL 计划树。规划和执行属于服务器上的
+ * pilot / executor —— 连不上时才退回本地兜底，页面永远不会是死屏。
+ */
+import Base from '@/layouts/Base.astro';
+---
+
+<Base
+  title="Robonix Playground"
+  description="A browser-side robot body for Robonix: typed capabilities, a live RTDL plan tree, and a robot that actually does the chore."
+>
+  <h1 class="page-title">Robonix Playground</h1>
+  <p class="page-lede">
+    The browser is the robot's <b>body</b> — it provides the chassis, arm, camera and
+    speaker as <a href="https://github.com/syswonder/robonix">Robonix</a> capabilities.
+    Planning and execution belong to the runtime; this page shows you the plan tree it
+    produces and runs. Ask for a chore in plain English.
+  </p>
+
+  <div class="lab" id="lab">
+    <div class="lab-stage">
+      <canvas id="lab-canvas"></canvas>
+      <div class="bubble" id="lab-bubble" hidden></div>
+      <div class="lab-hud" id="lab-hud" hidden><span class="lab-hud-dot"></span><span id="lab-hud-text"></span></div>
+      <button class="lab-mute" id="lab-mute" type="button" title="Mute sound effects" aria-label="Mute sound effects">♪</button>
+      <div class="lab-cam-float">
+        <span class="lab-cam-tag">robot camera</span>
+        <img id="lab-cam-img" alt="What the robot sees" />
+      </div>
+      <p class="lab-nogl">
+        This demo needs WebGL, which this browser has turned off or can't start.
+        The plan tree below still works.
+      </p>
+    </div>
+
+    <form class="lab-ask" id="lab-ask">
+      <input
+        id="lab-input" type="text" autocomplete="off"
+        placeholder="Cook me dinner…" aria-label="Ask the robot to do something" />
+      <button type="submit" id="lab-go">Run</button>
+    </form>
+
+    <p class="lab-examples" id="lab-examples"></p>
+    <p class="lab-note" id="lab-status">Ready.</p>
+  </div>
+
+  <div class="lab-panels">
+    <section class="lab-block lab-plan">
+      <h2>Plan <span class="lab-mode" id="lab-mode"></span></h2>
+      <div class="rtdl" id="lab-rtdl">
+        <p class="lab-empty">Ask for something and the plan tree appears here.</p>
+      </div>
+    </section>
+
+    <section class="lab-block">
+      <h2>World</h2>
+      <pre class="lab-state" id="lab-state"></pre>
+    </section>
+  </div>
+
+  <section class="section">
+    <h2>How it works</h2>
+    <div class="prose">
+      <p>
+        Robonix organises everything as capabilities, in three layers — the same split
+        its packages use (<code>primitive-*-rbnx</code>, <code>service-*-rbnx</code>,
+        <code>skill-*-rbnx</code>). This page implements the <b>primitive</b> layer:
+        <code>chassis.move</code>, <code>arm.grasp</code>, <code>arm.release</code>,
+        <code>camera.detect</code>, <code>camera.snapshot</code>,
+        <code>speaker.say</code>. Each one is an animation that resolves when the motion
+        finishes, which is how the executor knows a step is done.
+      </p>
+      <p>
+        A plan is an <b>RTDL</b> tree — Robot Task Description Language, the format the
+        pilot asks the model for. Only three node types exist: <code>sequence</code>
+        (ordered, fail-fast), <code>parallel</code> (concurrent, a failing branch doesn't
+        cancel its siblings), and <code>do</code> (call one capability). The tree above
+        updates live as the executor walks it.
+      </p>
+      <p>
+        The model only ever <em>proposes</em> a tree. Capability names and arguments are
+        checked against the catalog, and preconditions are checked before anything moves —
+        ask the robot to grab something it hasn't looked at and watch the step go red.
+      </p>
+    </div>
+  </section>
+</Base>
+
+<script>
+  import { LabWorld } from '@/lib/lab/world';
+  import { makePrimitives, CATALOG } from '@/lib/lab/primitives';
+  import { planLocally, runLocally } from '@/lib/lab/local-fallback';
+  import { renderEnvelope, type RtdlEnvelope } from '@/lib/lab/rtdl';
+  import { OBJECTS, PLACES } from '@/lib/lab/scene-spec';
+  import { sfx, setSfxEnabled, sfxEnabled, unlockAudioOnce } from '@/lib/lab/sfx';
+
+  const EXAMPLES = [
+    'Cook me dinner',
+    'Tidy up',
+    'Water the plant',
+    'Wash the dishes',
+    'Bring me the book',
+    'Throw away the wrapper',
+    'Grab the mug',           // 没先看就抓 —— 演示被运行时拒绝
+  ];
+
+  const canvas = document.getElementById('lab-canvas') as HTMLCanvasElement | null;
+  if (canvas) {
+    try { boot(canvas); }
+    catch (e) {
+      console.warn('[playground] WebGL unavailable:', e);
+      document.getElementById('lab')?.classList.add('is-nogl');
+      const s = document.getElementById('lab-status');
+      if (s) s.textContent = 'WebGL unavailable — the 3D view is disabled.';
+    }
+  }
+
+  function boot(canvas: HTMLCanvasElement) {
+    const bubble   = document.getElementById('lab-bubble')!;
+    const camImg   = document.getElementById('lab-cam-img') as HTMLImageElement;
+    const rtdlEl   = document.getElementById('lab-rtdl')!;
+    const stateEl  = document.getElementById('lab-state')!;
+    const statusEl = document.getElementById('lab-status')!;
+    const modeEl   = document.getElementById('lab-mode')!;
+    const exEl     = document.getElementById('lab-examples')!;
+    const form     = document.getElementById('lab-ask') as HTMLFormElement;
+    const input    = document.getElementById('lab-input') as HTMLInputElement;
+    const goBtn    = document.getElementById('lab-go') as HTMLButtonElement;
+
+    const hud = document.getElementById('lab-hud')!;
+    const hudText = document.getElementById('lab-hud-text')!;
+    const muteBtn = document.getElementById('lab-mute') as HTMLButtonElement;
+
+    unlockAudioOnce();
+
+    const world = new LabWorld(canvas, {
+      onSay(text) {
+        if (text) { bubble.textContent = text; bubble.hidden = false; speak(text); }
+        else bubble.hidden = true;
+      },
+      // 每个动作在 3D 视图里给个回显，不然只能盯着树猜现在在干嘛
+      onAction(label) {
+        if (label) { hudText.textContent = label; hud.hidden = false; }
+        else hud.hidden = true;
+      },
+    });
+
+    muteBtn.addEventListener('click', () => {
+      const on = !sfxEnabled();
+      setSfxEnabled(on);
+      muteBtn.textContent = on ? '♪' : '✕';
+      muteBtn.classList.toggle('is-off', !on);
+    });
+    const prims = makePrimitives(world);
+    let busy = false;
+    let env: RtdlEnvelope | null = null;
+
+    // 真运行时还没接上时的标注 —— 不假装
+    modeEl.textContent = 'local fallback';
+    modeEl.title = 'The Robonix runtime is not connected; planning and execution are running in the browser.';
+
+    /* --------------------------------------------------------- 语音
+       GLaDOS 的真实音色有版权、也没有公开可用的 TTS 模型，
+       所以这里是**风格近似**：挑一个偏合成感的女声，压低音高、放慢语速、
+       句读拉长，配合台词的冷淡语气。不是她本人，但那个味道在。 */
+    let voice: SpeechSynthesisVoice | null = null;
+    function pickVoice() {
+      const vs = speechSynthesis.getVoices();
+      // 优先挑听起来更「合成」的那几个，而不是最自然的
+      const prefer = [
+        /Zarvox|Trinoids|Whisper/i,        // macOS 里明显机械感的
+        /Microsoft Zira|Google UK English Female/i,
+        /en-GB/i,
+      ];
+      for (const re of prefer) {
+        const hit = vs.find((v) => re.test(v.name) || re.test(v.lang));
+        if (hit) { voice = hit; return; }
+      }
+      voice = vs.find((v) => /^en/.test(v.lang)) ?? null;
+    }
+    pickVoice();
+    speechSynthesis.addEventListener?.('voiceschanged', pickVoice);
+
+    function speak(text: string) {
+      try {
+        const u = new SpeechSynthesisUtterance(text);
+        if (voice) u.voice = voice;
+        // 慢、低、平 —— GLaDOS 的三个特征
+        u.rate = 0.82;
+        u.pitch = 0.55;
+        u.volume = 0.9;
+        speechSynthesis.cancel();
+        speechSynthesis.speak(u);
+      } catch { /* 不支持就只留气泡 */ }
+    }
+
+    /* --------------------------------------------------------- 示例 */
+    EXAMPLES.forEach((label, i) => {
+      if (i) exEl.append(' · ');
+      const b = document.createElement('button');
+      b.type = 'button'; b.className = 'lab-ex'; b.textContent = label;
+      b.addEventListener('click', () => { input.value = label; submit(label); });
+      exEl.appendChild(b);
+    });
+
+    /* --------------------------------------------------------- 渲染 */
+    function drawPlan() {
+      rtdlEl.innerHTML = env ? renderEnvelope(env) : '<p class="lab-empty">Ask for something.</p>';
+    }
+
+    function drawState() {
+      const s = world.snapshot();
+      const rows = [
+        `at        ${s.at}`,
+        `holding   ${s.holding ?? '—'}`,
+        '',
+        ...Object.entries(s.where)
+          .sort()
+          .map(([k, v]) => `${k.padEnd(9)} ${v === OBJECTS[k as keyof typeof OBJECTS]?.home ? v : v + '  *'}`),
+        '',
+        '* not in its usual place',
+      ];
+      stateEl.textContent = rows.join('\n');
+    }
+
+    /* --------------------------------------------------------- 执行 */
+    async function submit(task: string) {
+      if (busy || !task.trim()) return;
+
+      statusEl.className = 'lab-note';
+      statusEl.textContent = 'Planning…';
+
+      const planned = planLocally(task, world.snapshot() as any);
+      if (!planned) {
+        statusEl.className = 'lab-note is-err';
+        statusEl.textContent = "I couldn't turn that into a plan. Try one of the examples.";
+        return;
+      }
+
+      busy = true;
+      goBtn.disabled = true;
+      input.disabled = true;
+      env = planned;
+      drawPlan();
+      statusEl.textContent = 'Running…';
+
+      const res = await runLocally(env.rtdl, prims, { onUpdate: () => { drawPlan(); drawState(); } });
+
+      if (res.ok) {
+        env.task_update.status = 'succeeded';
+        statusEl.className = 'lab-note';
+        statusEl.textContent = 'Done.';
+        sfx.done();
+      } else {
+        env.task_update.status = 'failed';
+        statusEl.className = 'lab-note is-err';
+        statusEl.textContent = `Stopped: ${res.error}`;
+        sfx.reject();
+      }
+      drawPlan(); drawState();
+      busy = false;
+      goBtn.disabled = false;
+      input.disabled = false;
+      input.focus();
+    }
+
+    form.addEventListener('submit', (e) => { e.preventDefault(); submit(input.value); });
+
+    /* --------------------------------------------------------- 相机 */
+    setInterval(() => {
+      try { camImg.src = world.captureRobotView(0.55); } catch { /* 尚未就绪 */ }
+    }, 600);
+
+    addEventListener('resize', () => world.resize());
+    drawState();
+    drawPlan();
+  }
+</script>
+
+<style>
+  .page-title {
+    font-family: var(--font-sans);
+    font-size: var(--fs-h1);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--ls-tight);
+    margin: 0 0 var(--sp-3);
+  }
+  .page-lede {
+    max-width: var(--w-prose);
+    color: var(--text-muted);
+    font-size: var(--fs-base);
+    line-height: var(--lh-base);
+    margin: 0 0 var(--sp-5);
+  }
+
+  /* ---- 舞台 ---- */
+  .lab-stage { position: relative; }
+  .lab-stage canvas {
+    display: block;
+    width: 100%;
+    aspect-ratio: 4 / 3;
+    border: 1px solid var(--border);
+    background: var(--bg-subtle);
+  }
+  .lab-nogl { display: none; border: 1px solid var(--border); padding: var(--sp-5); color: var(--text-muted); }
+  .lab.is-nogl canvas { display: none; }
+  .lab.is-nogl .lab-nogl { display: block; }
+
+  .bubble {
+    position: absolute;
+    left: var(--sp-3); top: var(--sp-3);
+    max-width: 70%;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    padding: var(--sp-2) var(--sp-3);
+    font-size: var(--fs-sm);
+    line-height: var(--lh-snug);
+  }
+  .bubble[hidden] { display: none; }
+
+  /* ---- 输入 ---- */
+  .lab-ask { display: flex; gap: var(--sp-2); margin-top: var(--sp-4); }
+  .lab-ask input {
+    flex: 1; min-width: 0;
+    font-family: var(--font-sans); font-size: var(--fs-base);
+    color: var(--text); background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-2) var(--sp-3);
+  }
+  .lab-ask input:focus { outline: none; border-color: var(--link); }
+  .lab-ask button {
+    font-family: var(--font-sans); font-size: var(--fs-base);
+    color: var(--bg); background: var(--text);
+    border: 1px solid var(--text); border-radius: var(--radius-sm);
+    padding: var(--sp-2) var(--sp-5); cursor: pointer;
+  }
+  .lab-ask button:disabled { opacity: 0.4; cursor: default; }
+
+  .lab-examples { margin: var(--sp-3) 0 0; font-size: var(--fs-sm); color: var(--text-faint); line-height: var(--lh-base); }
+  .lab-ex {
+    font-family: var(--font-sans); font-size: var(--fs-sm);
+    color: var(--link); background: none; border: 0; padding: 0; cursor: pointer;
+  }
+  .lab-ex:hover { color: var(--link-hover); text-decoration: underline; }
+
+  .lab-note { margin: var(--sp-2) 0 0; font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); }
+  .lab-note.is-err { color: #c0392b; }
+  :root[data-theme='dark'] .lab-note.is-err { color: #ff6b6b; }
+
+  /* ---- 两块面板 ---- */
+  .lab-panels {
+    display: grid;
+    grid-template-columns: minmax(0, 1.35fr) minmax(0, 1fr);
+    gap: var(--sp-6);
+    margin-top: var(--sp-6);
+  }
+  .lab-block > h2 {
+    display: flex; align-items: baseline; gap: var(--sp-3);
+    font-family: var(--font-sans); font-size: var(--fs-h3);
+    font-weight: var(--fw-semibold); letter-spacing: var(--ls-tight);
+    margin: 0 0 var(--sp-3);
+    padding-bottom: var(--sp-2);
+    border-bottom: 1px solid var(--border);
+  }
+  .lab-h2-gap { margin-top: var(--sp-6) !important; }
+  .lab-mode {
+    font-family: var(--font-mono); font-size: var(--fs-xs);
+    font-weight: var(--fw-normal); color: var(--text-faint);
+  }
+  .lab-empty { color: var(--text-faint); font-size: var(--fs-sm); margin: 0; }
+
+  /* 当前动作：画布左下角，一个脉冲点 + 一句话 */
+  .lab-hud {
+    position: absolute;
+    left: var(--sp-3);
+    bottom: var(--sp-3);
+    display: flex;
+    align-items: center;
+    gap: var(--sp-2);
+    background: rgba(0,0,0,0.62);
+    color: #fff;
+    padding: var(--sp-2) var(--sp-3);
+    border-radius: var(--radius-sm);
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.01em;
+    max-width: 62%;
+  }
+  .lab-hud[hidden] { display: none; }
+  .lab-hud-dot {
+    width: 7px; height: 7px; border-radius: 50%;
+    background: #4ecdc4;
+    animation: labPulse 1s ease-in-out infinite;
+    flex-shrink: 0;
+  }
+  @keyframes labPulse { 0%,100% { opacity: 1; } 50% { opacity: 0.25; } }
+  @media (prefers-reduced-motion: reduce) { .lab-hud-dot { animation: none; } }
+
+  /* 静音开关 */
+  .lab-mute {
+    position: absolute;
+    right: var(--sp-3);
+    top: var(--sp-3);
+    width: 26px; height: 26px;
+    display: grid; place-items: center;
+    background: rgba(0,0,0,0.5);
+    color: #fff;
+    border: 0;
+    border-radius: var(--radius-sm);
+    font-size: 13px;
+    cursor: pointer;
+  }
+  .lab-mute.is-off { opacity: 0.5; }
+
+  /* 机器人视角：画布右下角的小窗，游戏里的 PIP 那种 */
+  .lab-cam-float {
+    position: absolute;
+    right: var(--sp-3);
+    bottom: var(--sp-3);
+    width: 30%;
+    max-width: 200px;
+    border: 1px solid var(--border-strong);
+    background: #000;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.25);
+  }
+  .lab-cam-float img { display: block; width: 100%; aspect-ratio: 4/3; object-fit: cover; }
+  .lab-cam-tag {
+    position: absolute; left: 4px; top: 2px; z-index: 1;
+    font-family: var(--font-mono); font-size: 10px; color: #fff;
+    text-shadow: 0 1px 3px rgba(0,0,0,0.9);
+  }
+
+  .lab-state {
+    margin: 0;
+    font-family: var(--font-mono); font-size: var(--fs-xs); line-height: 1.6;
+    color: var(--text-muted); background: var(--bg-code);
+    border: 1px solid var(--border); border-radius: var(--radius-sm);
+    padding: var(--sp-3); overflow-x: auto;
+  }
+
+  /* ---- RTDL 树 ---- */
+  .rtdl { font-size: var(--fs-xs); }
+  .rtdl :global(.rt-say) {
+    margin: 0 0 var(--sp-3);
+    font-family: var(--font-sans); font-size: var(--fs-base);
+    color: var(--text); line-height: var(--lh-snug);
+  }
+  .rtdl :global(.rt-head) {
+    display: flex; justify-content: space-between; align-items: baseline;
+    gap: var(--sp-3); margin-bottom: var(--sp-2);
+    font-size: var(--fs-sm); color: var(--text-muted);
+  }
+  .rtdl :global(.rt-progress) { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); }
+
+  .rtdl :global(.rt-tree-body) {
+    font-family: var(--font-mono);
+    line-height: 1.75;
+    overflow-x: auto;
+  }
+  .rtdl :global(.rt-row) { white-space: nowrap; }
+  .rtdl :global(.rt-tree)  { color: var(--border-strong); }
+  .rtdl :global(.rt-glyph) { display: inline-block; width: 1.4em; }
+  .rtdl :global(.rt-desc)  { color: var(--text); }
+  .rtdl :global(.rt-op)    { font-size: 0.9em; color: var(--text-faint); }
+  .rtdl :global(.rt-par)::before { content: '∥ '; }
+  .rtdl :global(.rt-cap)   { color: var(--link); }
+  .rtdl :global(.rt-args)  { color: var(--text-muted); }
+  .rtdl :global(.rt-ms)    { color: var(--text-faint); margin-left: var(--sp-2); }
+  .rtdl :global(.rt-error) { color: #c0392b; white-space: pre-wrap; }
+  :root[data-theme='dark'] .rtdl :global(.rt-error) { color: #ff6b6b; }
+
+  .rtdl :global(.is-pending)   { opacity: 0.45; }
+  .rtdl :global(.is-running)   { color: var(--link); font-weight: var(--fw-medium); }
+  .rtdl :global(.is-running .rt-desc) { color: var(--link-hover); }
+  .rtdl :global(.is-skipped)   { opacity: 0.25; }
+  .rtdl :global(.is-failed .rt-glyph),
+  .rtdl :global(.is-failed .rt-desc) { color: #c0392b; }
+  :root[data-theme='dark'] .rtdl :global(.is-failed .rt-glyph),
+  :root[data-theme='dark'] .rtdl :global(.is-failed .rt-desc) { color: #ff6b6b; }
+
+  .rtdl :global(.rt-goal) {
+    margin: var(--sp-4) 0 0; padding-top: var(--sp-2);
+    border-top: 1px solid var(--border);
+    font-size: var(--fs-sm); color: var(--text-muted);
+  }
+  .rtdl :global(.rt-goal span) {
+    font-family: var(--font-mono); font-size: var(--fs-xs);
+    color: var(--text-faint); margin-right: var(--sp-2);
+  }
+
+  /* ---- 窄屏 ---- */
+  @media (max-width: 60rem) {
+    .lab-panels { grid-template-columns: minmax(0, 1fr); gap: var(--sp-5); }
+  }
+  @media (max-width: 34rem) {
+    .lab-ask { flex-wrap: wrap; }
+    .lab-ask button { width: 100%; }
+    .lab-stage canvas { aspect-ratio: 1 / 1; }
+    .bubble { max-width: 84%; font-size: var(--fs-xs); }
+    /* 手机上树很容易横向溢出，缩一号并允许自己滚 */
+    .rtdl :global(.rt-tree-body) { font-size: 0.72rem; }
+  }
+</style>

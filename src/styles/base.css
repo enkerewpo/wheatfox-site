@@ -239,31 +239,55 @@ hr {
   :root:not([data-theme='light']) .theme-toggle .icon-moon { display: none; }
 }
 
-/* ---- 窄屏：塌成单栏，身份栏变顶部横条 ---- */
+/* --------------------------------------------------------------------------
+   窄屏
+   身份栏塌成顶部区块。关键是别把头像和一长串联系方式挤在同一行 ——
+   那样头像小得看不清，链接又挤在一条窄列里换行。
+   改成：头像 + 姓名一行，联系方式独占整宽横向流动。
+   -------------------------------------------------------------------------- */
 @media (max-width: 62rem) {
   .shell {
     grid-template-columns: minmax(0, 1fr);
-    gap: var(--sp-6);
+    gap: var(--sp-5);
+    padding-top: var(--sp-6);
   }
+
   .sidebar {
     position: static;
     max-height: none;
     overflow: visible;
-    padding-bottom: var(--sp-5);
+    padding-bottom: var(--sp-4);
     border-bottom: 1px solid var(--border);
     display: grid;
-    grid-template-columns: auto 1fr;
+    grid-template-columns: auto minmax(0, 1fr);
     grid-template-areas:
       'avatar ident'
+      'links  links'
       'nav    nav';
-    gap: var(--sp-3) var(--sp-4);
+    column-gap: var(--sp-4);
+    row-gap: var(--sp-4);
     align-items: center;
   }
+
   .sidebar-portrait { grid-area: avatar; margin-bottom: 0; }
-  .sidebar-avatar { width: 84px; max-width: none; }
-  .sidebar-ident { grid-area: ident; }
-  .sidebar-role { margin-bottom: var(--sp-2); }
-  .sidebar-links { margin-bottom: 0; }
+  .sidebar-avatar { width: 104px; max-width: none; }
+
+  .sidebar-ident { grid-area: ident; min-width: 0; }
+  .sidebar-name { font-size: var(--fs-h2); }
+  .sidebar-handle { margin-bottom: var(--sp-2); }
+  .sidebar-role { margin-bottom: 0; }
+
+  /* 联系方式独占整宽，横向排布 */
+  .sidebar-links {
+    grid-area: links;
+    margin: 0;
+    display: flex;
+    flex-wrap: wrap;
+    gap: var(--sp-2) var(--sp-4);
+  }
+  .sidebar-links li { margin-bottom: 0; }
+  .sidebar-links .sub { display: inline; margin-left: var(--sp-2); }
+
   .sidebar-nav-wrap {
     grid-area: nav;
     display: flex;
@@ -274,7 +298,7 @@ hr {
   .site-nav {
     flex-direction: row;
     flex-wrap: wrap;
-    gap: var(--sp-4);
+    gap: var(--sp-2) var(--sp-4);
     border-top: 0;
     padding-top: 0;
   }
@@ -284,6 +308,18 @@ hr {
     border-top: 0;
     margin-left: auto;
   }
+
+  /* 触屏没有物理键盘，反引号提示没意义 */
+  .term-hint { display: none; }
+}
+
+/* 更窄：头像和姓名也叠起来会更挤，保持并排但缩小 */
+@media (max-width: 26rem) {
+  .shell { padding-left: var(--sp-4); padding-right: var(--sp-4); }
+  .page-footer { padding-left: var(--sp-4); padding-right: var(--sp-4); }
+  .sidebar-avatar { width: 84px; }
+  .sidebar-name { font-size: var(--fs-h3); }
+  .post-item { grid-template-columns: 1fr; gap: 2px; }
 }
 
 /* --------------------------------------------------------------------------
