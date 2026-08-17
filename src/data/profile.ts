@@ -53,10 +53,12 @@ export const profile = {
   interests: [
       'Operating Systems',
       'Virtualization & Hypervisors',
-      'Embodied AI Runtimes',
+      // 用白皮书里确立的术语（EAIOS），不自己造词
+      'Embodied AI Operating Systems',
+      // Robonix 的核心是编排、调度、在模型之间切换 —— 这条之前漏了
+      'Agent Systems & Scheduling',
       'Rust for Systems',
-      'Heterogeneous Hardware',
-      'LoongArch',
+      'LoongArch & Heterogeneous Hardware',
     ],
 } as const;
 
