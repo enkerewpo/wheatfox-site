@@ -9,10 +9,10 @@ tags:
 - Formal Verification
 ---
 
-<object data="slide.pdf" type="application/pdf" width="100%" height="900px">
-    <embed src="slide.pdf">
-        <p>This browser does not support PDFs. Please download the PDF to view it: <a href="slide.pdf">Download PDF</a>.</p>
+<object data="/posts/20241128-syswonder-report/slide.pdf" type="application/pdf" width="100%" height="900px">
+    <embed src="/posts/20241128-syswonder-report/slide.pdf">
+        <p>This browser does not support PDFs. Please download the PDF to view it: <a href="/posts/20241128-syswonder-report/slide.pdf">Download PDF</a>.</p>
     </embed>
 </object>
 
-<a href="slide.pdf">click to download pdf</a>
+<a href="/posts/20241128-syswonder-report/slide.pdf">click to download pdf</a>

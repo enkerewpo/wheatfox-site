@@ -1,0 +1,141 @@
+---
+/**
+ * 彩蛋：favicon 里跑 Conway 生命游戏。
+ *
+ * 标签页上那个 16×16 的小图标自己在演化。绝大多数人不会发现，
+ * 发现的人会觉得有意思 —— 比在页面上铺一层 Life 背景克制得多，
+ * 也完全不抢正文。
+ *
+ * 几条自我约束：
+ *   · 标签页不可见时暂停（visibilitychange），不空转耗电
+ *   · prefers-reduced-motion 时直接不启动，退回静态 favicon
+ *   · 局面稳定/循环了就重新播种，不会僵在一格不动
+ */
+---
+
+<script>
+  const SIZE = 16;           // favicon 网格边长
+  const SCALE = 4;           // 实际画布 64×64，缩放后边缘更清楚
+  const INTERVAL = 700;      // 每代间隔，慢一点才不烦人
+
+  // 尊重系统的减少动效偏好：直接不跑
+  if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    startLife();
+  }
+
+  function startLife() {
+    const canvas = document.createElement('canvas');
+    canvas.width = canvas.height = SIZE * SCALE;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    // 复用页面现有的 favicon 节点，没有就建一个
+    let link = document.querySelector<HTMLLinkElement>('link[rel="icon"]');
+    if (!link) {
+      link = document.createElement('link');
+      link.rel = 'icon';
+      document.head.appendChild(link);
+    }
+    const original = link.href;
+
+    let grid = seed();
+    let timer: number | undefined;
+    /** 记录最近几代的指纹，用来发现「死局」和短周期循环 */
+    let history: string[] = [];
+
+    function seed(): Uint8Array {
+      const g = new Uint8Array(SIZE * SIZE);
+      for (let i = 0; i < g.length; i++) g[i] = Math.random() < 0.32 ? 1 : 0;
+      return g;
+    }
+
+    function step(g: Uint8Array): Uint8Array {
+      const next = new Uint8Array(g.length);
+      for (let y = 0; y < SIZE; y++) {
+        for (let x = 0; x < SIZE; x++) {
+          let n = 0;
+          for (let dy = -1; dy <= 1; dy++) {
+            for (let dx = -1; dx <= 1; dx++) {
+              if (dx === 0 && dy === 0) continue;
+              // 环面拓扑：滑翔机走到边上会从另一边出来
+              const nx = (x + dx + SIZE) % SIZE;
+              const ny = (y + dy + SIZE) % SIZE;
+              n += g[ny * SIZE + nx];
+            }
+          }
+          const alive = g[y * SIZE + x];
+          next[y * SIZE + x] = alive ? (n === 2 || n === 3 ? 1 : 0) : n === 3 ? 1 : 0;
+        }
+      }
+      return next;
+    }
+
+    /** 取当前主题的前景/背景色，暗色模式下也看得清 */
+    function colors() {
+      const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+      return dark
+        ? { bg: '#1a1a1a', fg: '#c9a9a9' }   // 暗色：灰玫瑰亮一点
+        : { bg: '#fdfdf5', fg: '#9F8383' };  // 亮色：米白底 + 灰玫瑰
+    }
+
+    function draw(g: Uint8Array) {
+      const { bg, fg } = colors();
+      ctx.fillStyle = bg;
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.fillStyle = fg;
+      for (let i = 0; i < g.length; i++) {
+        if (!g[i]) continue;
+        const x = (i % SIZE) * SCALE;
+        const y = Math.floor(i / SIZE) * SCALE;
+        ctx.fillRect(x, y, SCALE, SCALE);
+      }
+      link!.href = canvas.toDataURL('image/png');
+    }
+
+    function tick() {
+      grid = step(grid);
+
+      // 全灭、静物、或短周期振荡 —— 都重新播种，免得图标僵住
+      const key = grid.join('');
+      if (history.includes(key) || !grid.some(Boolean)) {
+        grid = seed();
+        history = [];
+      } else {
+        history.push(key);
+        if (history.length > 12) history.shift();
+      }
+
+      draw(grid);
+    }
+
+    function play() {
+      if (timer !== undefined) return;
+      timer = window.setInterval(tick, INTERVAL);
+    }
+    function pause() {
+      if (timer === undefined) return;
+      clearInterval(timer);
+      timer = undefined;
+    }
+
+    // 标签页切走就停，切回来接着跑
+    document.addEventListener('visibilitychange', () => {
+      document.hidden ? pause() : play();
+    });
+
+    // 主题切换时立刻重画，不用等下一代
+    new MutationObserver(() => draw(grid)).observe(document.documentElement, {
+      attributes: true,
+      attributeFilter: ['data-theme'],
+    });
+
+    // 离开页面时把原来的 favicon 还回去，免得 bfcache 回来是张 data URL
+    window.addEventListener('pagehide', () => {
+      pause();
+      if (link) link.href = original;
+    });
+
+    draw(grid);
+    play();
+  }
+</script>

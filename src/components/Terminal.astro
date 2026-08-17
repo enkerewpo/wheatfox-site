@@ -1,0 +1,429 @@
+---
+/**
+ * 彩蛋：终端浮层。按 ` 或 Ctrl+K 唤出，Esc 关闭。
+ *
+ * 把站点当成一个文件系统来逛：ls / cd / cat / open / uname / ps ...
+ * 对做 OS 的人来说这不只是噱头 —— 键盘不离手就能跳到任何一篇文章。
+ *
+ * 站点结构在构建期序列化成 JSON 塞进页面，运行时不发任何请求。
+ */
+import { getPosts, postUrl, formatDate } from '@/lib/posts';
+import { getTags, tagSlug } from '@/lib/posts';
+import { url } from '@/lib/url';
+
+const posts = await getPosts();
+const tags = await getTags();
+
+/** 传给前端的最小站点索引 */
+const fs = {
+  base: url('/'),
+  pages: [
+    { name: 'about',        path: url('/'),             desc: 'whoami, bio, news' },
+    { name: 'publications', path: url('/publications/'), desc: 'papers and reports' },
+    { name: 'open-source',  path: url('/open-source/'),  desc: 'upstream patches' },
+    { name: 'blog',         path: url('/blog/'),         desc: `${posts.length} posts` },
+    { name: 'tags',         path: url('/tags/'),         desc: `${tags.length} tags` },
+  ],
+  posts: posts.map((p) => ({
+    slug: p.id,
+    title: p.data.title,
+    date: formatDate(p.data.date),
+    path: postUrl(p),
+    tags: p.data.tags,
+  })),
+  tags: tags.map((t) => ({ name: t.tag, count: t.count, path: url(`/tags/${tagSlug(t.tag)}/`) })),
+};
+---
+
+<div class="term" id="term" hidden aria-hidden="true">
+  <div class="term-box" role="dialog" aria-label="Site terminal">
+    <div class="term-bar">
+      <span class="term-title">wheatfox@oscommunity — sh</span>
+      <button class="term-close" type="button" aria-label="Close">esc</button>
+    </div>
+    <div class="term-out" id="term-out"></div>
+    <div class="term-in">
+      <span class="term-prompt" id="term-prompt">~ $</span>
+      <input
+        id="term-cmd"
+        type="text"
+        autocomplete="off"
+        autocapitalize="off"
+        autocorrect="off"
+        spellcheck="false"
+        aria-label="Command"
+      />
+    </div>
+  </div>
+</div>
+
+<script is:inline set:html={`window.__SITE_FS__ = ${JSON.stringify(fs)};`} />
+
+<script>
+  type Post = { slug: string; title: string; date: string; path: string; tags: string[] };
+  type Page = { name: string; path: string; desc: string };
+  type Tag  = { name: string; count: number; path: string };
+  type FS   = { base: string; pages: Page[]; posts: Post[]; tags: Tag[] };
+
+  const fs: FS = (window as any).__SITE_FS__;
+
+  const root   = document.getElementById('term')!;
+  const out    = document.getElementById('term-out')!;
+  const input  = document.getElementById('term-cmd') as HTMLInputElement;
+  const prompt = document.getElementById('term-prompt')!;
+  const closeBtn = root.querySelector('.term-close') as HTMLButtonElement;
+
+  /** 当前目录：'' = 根，'blog'、'tags' */
+  let cwd = '';
+  const history: string[] = [];
+  let historyIdx = -1;
+
+  const BOOT = [
+    'wheatfox site shell — type <b>help</b> for commands, <b>esc</b> to close.',
+  ];
+
+  function esc(s: string) {
+    return s.replace(/[&<>"]/g, (c) =>
+      ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
+  }
+
+  function print(html: string) {
+    const line = document.createElement('div');
+    line.className = 'term-line';
+    line.innerHTML = html;
+    out.appendChild(line);
+    out.scrollTop = out.scrollHeight;
+  }
+
+  /** 当前上下文下 Tab 能补全的东西 */
+  function candidates(cmd: string, prefix: string): string[] {
+    const names = (xs: { name?: string; slug?: string }[]) =>
+      xs.map((x) => x.name ?? x.slug!) as string[];
+
+    let pool: string[] = [];
+    if (cmd === 'cd') pool = ['blog', 'tags', '..', '~'];
+    else if (cmd === 'open' || cmd === 'cat')
+      pool = [...names(fs.pages), ...names(fs.posts), ...names(fs.tags)];
+    else if (cmd === 'ls') pool = ['blog', 'tags'];
+    else if (cmd === 'uname') pool = ['-a'];
+    else pool = Object.keys(commands);
+
+    return pool.filter((c) => c.startsWith(prefix)).sort();
+  }
+
+  /** 一串字符串的最长公共前缀 —— bash 补到歧义处就停，这里照做 */
+  function commonPrefix(xs: string[]): string {
+    if (!xs.length) return '';
+    let p = xs[0];
+    for (const x of xs.slice(1)) {
+      while (!x.startsWith(p)) p = p.slice(0, -1);
+      if (!p) break;
+    }
+    return p;
+  }
+
+  function complete() {
+    const value = input.value;
+    const parts = value.split(/\s+/);
+    const editingCmd = parts.length === 1;
+    const prefix = parts[parts.length - 1] ?? '';
+    const cmd = editingCmd ? '' : parts[0];
+
+    const hits = candidates(cmd, prefix);
+    if (!hits.length) return;
+
+    if (hits.length === 1) {
+      parts[parts.length - 1] = hits[0];
+      input.value = parts.join(' ') + ' ';
+      return;
+    }
+
+    // 多个候选：先补到公共前缀，再把候选列出来（和 bash 一致）
+    const cp = commonPrefix(hits);
+    if (cp.length > prefix.length) {
+      parts[parts.length - 1] = cp;
+      input.value = parts.join(' ');
+      return;
+    }
+    print(`<span class="p">~${cwd ? '/' + cwd : ''} $</span> ${esc(value)}`);
+    print(`<span class="m">${hits.slice(0, 40).map(esc).join('  ')}${hits.length > 40 ? ` … +${hits.length - 40}` : ''}</span>`);
+  }
+
+  function setPrompt() {
+    prompt.textContent = `~${cwd ? '/' + cwd : ''} $`;
+  }
+
+  /* ---------------------------------------------------------------- 命令 */
+
+  const commands: Record<string, (args: string[]) => void> = {
+    help() {
+      print(`<span class="c">Commands</span>
+  <b>ls</b> [dir]      list this directory
+  <b>cd</b> &lt;dir&gt;      change directory (blog, tags, ..)
+  <b>cat</b> &lt;name&gt;    show an entry's details
+  <b>open</b> &lt;name&gt;   navigate to it
+  <b>find</b> &lt;text&gt;   search post titles
+  <b>pwd</b>           print working directory
+  <b>uname</b> -a      system information
+  <b>whoami</b>        the short version
+  <b>ps</b>            what's running
+  <b>date</b>          current time
+  <b>clear</b>         clear the screen
+  <b>exit</b>          close this shell
+
+<span class="m">tab completes · ↑↓ history · ctrl-c clear line · ctrl-l clear screen</span>`);
+    },
+
+    ls(args) {
+      const dir = args[0] ?? cwd;
+      if (dir === 'blog' || (dir === '' && cwd === 'blog')) {
+        fs.posts.forEach((p) =>
+          print(`<span class="d">${p.date}</span>  <span class="f">${esc(p.slug)}</span>  <span class="m">${esc(p.title)}</span>`));
+        return;
+      }
+      if (dir === 'tags' || (dir === '' && cwd === 'tags')) {
+        fs.tags.forEach((t) =>
+          print(`<span class="d">${String(t.count).padStart(3)}</span>  <span class="f">${esc(t.name)}</span>`));
+        return;
+      }
+      fs.pages.forEach((p) =>
+        print(`<span class="dir">${p.name}${p.name === 'blog' || p.name === 'tags' ? '/' : ''}</span>  <span class="m">${esc(p.desc)}</span>`));
+    },
+
+    cd(args) {
+      const target = args[0] ?? '';
+      if (target === '' || target === '~' || target === '/') { cwd = ''; setPrompt(); return; }
+      if (target === '..') { cwd = ''; setPrompt(); return; }
+      if (target === 'blog' || target === 'tags') { cwd = target; setPrompt(); return; }
+      const page = fs.pages.find((p) => p.name === target);
+      if (page) { print(`<span class="m">${esc(target)} is a page — try <b>open ${esc(target)}</b></span>`); return; }
+      print(`<span class="e">cd: ${esc(target)}: No such file or directory</span>`);
+    },
+
+    pwd() { print(`/${cwd}`); },
+
+    cat(args) {
+      const name = args[0];
+      if (!name) { print('<span class="e">cat: missing operand</span>'); return; }
+      const post = fs.posts.find((p) => p.slug === name);
+      if (post) {
+        print(`<span class="c">${esc(post.title)}</span>`);
+        print(`<span class="m">date:</span> ${post.date}`);
+        print(`<span class="m">tags:</span> ${post.tags.map(esc).join(', ') || '—'}`);
+        print(`<span class="m">path:</span> <a href="${post.path}">${post.path}</a>`);
+        return;
+      }
+      const page = fs.pages.find((p) => p.name === name);
+      if (page) { print(`<span class="m">${esc(page.desc)}</span> → <a href="${page.path}">${page.path}</a>`); return; }
+      print(`<span class="e">cat: ${esc(name)}: No such file or directory</span>`);
+    },
+
+    open(args) {
+      const name = args[0];
+      if (!name) { print('<span class="e">open: missing operand</span>'); return; }
+      const hit =
+        fs.posts.find((p) => p.slug === name) ??
+        fs.pages.find((p) => p.name === name) ??
+        fs.tags.find((t) => t.name === name);
+      if (!hit) { print(`<span class="e">open: ${esc(name)}: not found</span>`); return; }
+      print(`<span class="m">opening ${esc(name)}…</span>`);
+      location.href = (hit as any).path;
+    },
+
+    find(args) {
+      const q = args.join(' ').toLowerCase();
+      if (!q) { print('<span class="e">find: missing pattern</span>'); return; }
+      const hits = fs.posts.filter((p) => p.title.toLowerCase().includes(q) || p.slug.includes(q));
+      if (!hits.length) { print(`<span class="m">no matches for “${esc(q)}”</span>`); return; }
+      hits.forEach((p) =>
+        print(`<span class="d">${p.date}</span>  <span class="f">${esc(p.slug)}</span>  <span class="m">${esc(p.title)}</span>`));
+    },
+
+    uname(args) {
+      if (args.includes('-a')) {
+        print('wheatfox 6.6.0-astro #1 SMP PREEMPT_DYNAMIC static x86_64 GNU/Linux');
+        return;
+      }
+      print('wheatfox');
+    },
+
+    whoami() {
+      print('Yulong Han (wheatfox) — PhD candidate, Peking University.');
+      print('<span class="m">Operating systems, in Rust and C.</span>');
+    },
+
+    ps() {
+      print('<span class="m">  PID TTY          TIME CMD</span>');
+      print('  404 ?        00:00:00 hvisor');
+      print('  512 ?        00:00:01 robonix');
+      print(' 1024 ?        00:00:00 conway   <span class="m">(check the tab icon)</span>');
+      print(' 2048 ?        00:00:00 sh');
+    },
+
+    date() { print(new Date().toString()); },
+
+    clear() { out.innerHTML = ''; },
+
+    exit() { close(); },
+  };
+  commands.q = commands.exit;
+  commands['?'] = commands.help;
+
+  /* ---------------------------------------------------------------- 交互 */
+
+  function run(raw: string) {
+    const line = raw.trim();
+    print(`<span class="p">~${cwd ? '/' + cwd : ''} $</span> ${esc(line)}`);
+    if (!line) return;
+    history.push(line);
+    historyIdx = history.length;
+
+    const [cmd, ...args] = line.split(/\s+/);
+    const fn = commands[cmd];
+    if (fn) fn(args);
+    else print(`<span class="e">${esc(cmd)}: command not found</span> <span class="m">— try help</span>`);
+  }
+
+  function open() {
+    root.hidden = false;
+    root.setAttribute('aria-hidden', 'false');
+    if (!out.childElementCount) BOOT.forEach(print);
+    setPrompt();
+    input.focus();
+  }
+
+  function close() {
+    root.hidden = true;
+    root.setAttribute('aria-hidden', 'true');
+    input.blur();
+  }
+
+  document.addEventListener('keydown', (e) => {
+    const typing = /^(INPUT|TEXTAREA|SELECT)$/.test((e.target as HTMLElement)?.tagName ?? '');
+
+    // ` 唤出（不在输入框里时），Ctrl/Cmd+K 也行
+    if (!typing && e.key === '`') { e.preventDefault(); root.hidden ? open() : close(); return; }
+    if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') { e.preventDefault(); root.hidden ? open() : close(); return; }
+    if (e.key === 'Escape' && !root.hidden) { e.preventDefault(); close(); }
+  });
+
+  closeBtn.addEventListener('click', close);
+  root.addEventListener('click', (e) => { if (e.target === root) close(); });
+
+  input.addEventListener('keydown', (e) => {
+    // Tab 默认会把焦点移出输入框（Chrome 的行为），必须拦下来自己做补全
+    if (e.key === 'Tab') { e.preventDefault(); complete(); return; }
+    if (e.key === 'Enter') { run(input.value); input.value = ''; return; }
+    // Ctrl+C 清空当前行，Ctrl+L 清屏 —— 手指记忆
+    if (e.ctrlKey && e.key.toLowerCase() === 'c') { e.preventDefault(); print(`<span class="p">~${cwd ? '/' + cwd : ''} $</span> ${esc(input.value)}^C`); input.value = ''; return; }
+    if (e.ctrlKey && e.key.toLowerCase() === 'l') { e.preventDefault(); out.innerHTML = ''; return; }
+    // 上下键翻历史
+    if (e.key === 'ArrowUp')   { e.preventDefault(); if (historyIdx > 0) input.value = history[--historyIdx]; return; }
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      if (historyIdx < history.length - 1) input.value = history[++historyIdx];
+      else { historyIdx = history.length; input.value = ''; }
+    }
+  });
+</script>
+
+<style>
+  .term {
+    position: fixed;
+    inset: 0;
+    z-index: 200;
+    background: rgba(0, 0, 0, 0.45);
+    display: flex;
+    align-items: flex-start;
+    justify-content: center;
+    padding: 8vh var(--sp-4) var(--sp-4);
+  }
+  .term[hidden] { display: none; }
+
+  .term-box {
+    width: min(64rem, 100%);
+    max-height: 70vh;
+    display: flex;
+    flex-direction: column;
+    background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius);
+    box-shadow: 0 16px 48px rgba(0, 0, 0, 0.3);
+    overflow: hidden;
+  }
+
+  .term-bar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: var(--sp-2) var(--sp-3);
+    border-bottom: 1px solid var(--border);
+    background: var(--bg-subtle);
+  }
+  .term-title {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    color: var(--text-muted);
+  }
+  .term-close {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+    background: transparent;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    padding: 0 var(--sp-2);
+    cursor: pointer;
+  }
+  .term-close:hover { color: var(--text); border-color: var(--border-strong); }
+
+  .term-out {
+    flex: 1;
+    overflow-y: auto;
+    padding: var(--sp-3);
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
+    line-height: 1.6;
+  }
+  /*
+    这些行是 JS 动态建的，拿不到 Astro 的 scoped 属性，
+    必须写成 :global 才生效 —— 不然 pre-wrap 不起作用，
+    ps / ls 的列对齐全塌了。
+  */
+  .term-out :global(.term-line) {
+    white-space: pre-wrap;
+    word-break: break-word;
+  }
+
+  .term-in {
+    display: flex;
+    align-items: baseline;
+    gap: var(--sp-2);
+    padding: var(--sp-2) var(--sp-3) var(--sp-3);
+    border-top: 1px solid var(--border);
+    font-family: var(--font-mono);
+    font-size: var(--fs-sm);
+  }
+  .term-prompt { color: var(--link); white-space: nowrap; }
+  .term-in input {
+    flex: 1;
+    min-width: 0;
+    background: transparent;
+    border: 0;
+    outline: none;
+    color: var(--text);
+    font-family: inherit;
+    font-size: inherit;
+  }
+
+  /* 输出配色 */
+  .term-out :global(.p)   { color: var(--link); }
+  .term-out :global(.c)   { color: var(--text); font-weight: var(--fw-bold); }
+  .term-out :global(.d)   { color: var(--text-faint); }
+  .term-out :global(.f)   { color: var(--text); }
+  .term-out :global(.dir) { color: var(--link); font-weight: var(--fw-medium); }
+  .term-out :global(.m)   { color: var(--text-muted); }
+  .term-out :global(.e)   { color: #c0392b; }
+  :root[data-theme='dark'] .term-out :global(.e) { color: #ff6b6b; }
+  .term-out :global(a)    { color: var(--link); text-decoration: underline; }
+</style>

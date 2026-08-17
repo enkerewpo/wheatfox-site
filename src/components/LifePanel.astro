@@ -1,0 +1,119 @@
+---
+/**
+ * 侧栏底部一条会动的生命游戏网格。
+ *
+ * favicon 里那个 16×16 太隐蔽了（谁会盯着标签页看），所以这里放一条
+ * 看得见的。刻意用极低的对比度 —— 读成「纹理」而不是「内容」，
+ * 不跟正文抢注意力，但站久了会发现它一直在变。
+ *
+ * 点一下重新播种。
+ */
+---
+
+<div class="life">
+  <canvas id="life-canvas" aria-hidden="true"></canvas>
+  <button class="life-reseed" type="button" aria-label="Reseed the Game of Life">life</button>
+</div>
+
+<script>
+  import { makeGrid, seed, addGlider, step, StallDetector, type Grid } from '@/lib/life';
+
+  const CELL = 4;        // 每格 4 CSS px
+  const INTERVAL = 500;  // 每代间隔
+
+  const canvas = document.getElementById('life-canvas') as HTMLCanvasElement | null;
+  const btn = document.querySelector<HTMLButtonElement>('.life-reseed');
+  if (canvas) run(canvas);
+
+  function run(canvas: HTMLCanvasElement) {
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let grid: Grid;
+    const stall = new StallDetector();
+    let timer: number | undefined;
+
+    function fit() {
+      const dpr = window.devicePixelRatio || 1;
+      const cssW = canvas.clientWidth || 240;
+      const cssH = 56;
+      canvas.width = Math.round(cssW * dpr);
+      canvas.height = Math.round(cssH * dpr);
+      canvas.style.height = cssH + 'px';
+      ctx!.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+      const w = Math.max(8, Math.floor(cssW / CELL));
+      const h = Math.max(4, Math.floor(cssH / CELL));
+      grid = seed(makeGrid(w, h), 0.3);
+      addGlider(grid, 2, 2);   // 保证一定有个会动的东西
+      stall.reset();
+      draw();
+    }
+
+    function draw() {
+      const cs = getComputedStyle(document.documentElement);
+      const fg = cs.getPropertyValue('--border-strong').trim() || '#aaa';
+      ctx!.clearRect(0, 0, canvas.width, canvas.height);
+      ctx!.fillStyle = fg;
+      for (let i = 0; i < grid.cells.length; i++) {
+        if (!grid.cells[i]) continue;
+        const x = (i % grid.w) * CELL;
+        const y = Math.floor(i / grid.w) * CELL;
+        ctx!.fillRect(x, y, CELL - 1, CELL - 1);
+      }
+    }
+
+    function tick() {
+      grid = step(grid);
+      if (stall.check(grid)) {
+        grid = seed(makeGrid(grid.w, grid.h), 0.3);
+        addGlider(grid, 2, 2);
+      }
+      draw();
+    }
+
+    const play = () => { if (timer === undefined) timer = window.setInterval(tick, INTERVAL); };
+    const pause = () => { if (timer !== undefined) { clearInterval(timer); timer = undefined; } };
+
+    fit();
+    // 只在标签页可见时跑，别空转耗电
+    document.addEventListener('visibilitychange', () => (document.hidden ? pause() : play()));
+    // 主题切换要立刻重画，不然颜色对不上
+    new MutationObserver(draw).observe(document.documentElement, {
+      attributes: true, attributeFilter: ['data-theme'],
+    });
+    window.addEventListener('resize', fit);
+    btn?.addEventListener('click', fit);
+
+    if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) play();
+  }
+</script>
+
+<style>
+  .life {
+    margin-top: var(--sp-5);
+    padding-top: var(--sp-4);
+    border-top: 1px solid var(--border);
+  }
+  .life canvas {
+    display: block;
+    width: 100%;
+    /* 压得很低，是背景纹理不是内容 */
+    opacity: 0.5;
+  }
+  .life-reseed {
+    margin-top: var(--sp-2);
+    padding: 0;
+    background: none;
+    border: 0;
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    color: var(--text-faint);
+    cursor: pointer;
+  }
+  .life-reseed:hover { color: var(--link); }
+  .life-reseed::before { content: '↻ '; }
+
+  /* 窄屏塌成横条时这块就别占地方了 */
+  @media (max-width: 62rem) { .life { display: none; } }
+</style>

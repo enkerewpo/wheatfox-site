@@ -3,14 +3,10 @@ import { site, images } from '@/config';
 import { url } from '@/lib/url';
 import Sidebar from '@/components/Sidebar.astro';
 import Footer from '@/components/Footer.astro';
+import Terminal from '@/components/Terminal.astro';
+import LifeFavicon from '@/components/LifeFavicon.astro';
 
 // 自托管字体，不走任何第三方 CDN
-import '@fontsource/patrick-hand/400.css';
-import '@fontsource/fira-sans/400.css';
-import '@fontsource/fira-sans/500.css';
-import '@fontsource/fira-sans/700.css';
-import '@fontsource/fira-sans/400-italic.css';
-import '@fontsource-variable/source-code-pro';
 
 import '../styles/tokens.css';
 import '../styles/base.css';
@@ -53,6 +49,16 @@ const ogImageUrl = new URL(ogImage, base).href;
     <meta name="author" content={site.author} />
     <link rel="canonical" href={canonical} />
 
+
+    {/*
+      preload 最关键的两个字体：正文常规体和代码体。
+      不 preload 的话浏览器要等 CSS 解析完才知道要下载它们，
+      这个延迟就是翻页时字体闪一下的直接原因。
+    */}
+    <link rel="preload" as="font" type="font/woff2" crossorigin
+          href={url('/fonts/fira-sans-latin-400-normal.woff2')} />
+    <link rel="preload" as="font" type="font/woff2" crossorigin
+          href={url('/fonts/source-code-pro-latin-wght-normal.woff2')} />
 
     <link rel="icon" href={url(images.favicon)} />
     <link rel="apple-touch-icon" href={url(images.appleTouchIcon)} />
@@ -118,5 +124,9 @@ const ogImageUrl = new URL(ogImage, base).href;
         <Footer />
       </div>
     </div>
+
+    {/* 彩蛋：终端浮层（按 ` 唤出）+ favicon 里跑生命游戏 */}
+    <Terminal />
+    <LifeFavicon />
   </body>
 </html>

@@ -1,0 +1,59 @@
+/* ==========================================================================
+   字体 —— 自己声明 @font-face，不用 @fontsource 的 CSS
+   ==========================================================================
+
+   为什么不直接 import @fontsource：
+   它按 unicode 子集把每个字重拆成 latin / latin-ext / cyrillic / greek /
+   vietnamese 等好几个文件，一共 37 个。浏览器必须先下载并解析 CSS，
+   才知道该取哪几个子集，这一来一回就是一帧回退字体，翻页时看起来就是「闪一下」。
+
+   这里只保留 latin 子集、固定文件名（放在 public/fonts/），
+   再在 Base.astro 里 preload 最关键的两个，HTML 一到手就开始下载。
+   6 个文件、152KB，中文走系统字体不打包。
+*/
+
+@font-face {
+  font-family: 'Fira Sans';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/fira-sans-latin-400-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Fira Sans';
+  font-style: italic;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/fira-sans-latin-400-italic.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Fira Sans';
+  font-style: normal;
+  font-weight: 500;
+  font-display: swap;
+  src: url('/fonts/fira-sans-latin-500-normal.woff2') format('woff2');
+}
+@font-face {
+  font-family: 'Fira Sans';
+  font-style: normal;
+  font-weight: 700;
+  font-display: swap;
+  src: url('/fonts/fira-sans-latin-700-normal.woff2') format('woff2');
+}
+
+/* 变量字体，一个文件覆盖 200-900 全字重 */
+@font-face {
+  font-family: 'Source Code Pro Variable';
+  font-style: normal;
+  font-weight: 200 900;
+  font-display: swap;
+  src: url('/fonts/source-code-pro-latin-wght-normal.woff2') format('woff2-variations');
+}
+
+@font-face {
+  font-family: 'Patrick Hand';
+  font-style: normal;
+  font-weight: 400;
+  font-display: swap;
+  src: url('/fonts/patrick-hand-latin-400-normal.woff2') format('woff2');
+}

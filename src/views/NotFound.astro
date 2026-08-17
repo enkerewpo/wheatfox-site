@@ -1,33 +1,86 @@
 ---
+/**
+ * 404 —— 伪装成内核 oops。
+ *
+ * 格式照着真实的 aarch64 oops 抄的（Unable to handle kernel paging request /
+ * Mem abort info / 寄存器转储 / Call trace），但内容全是这个站自己的东西：
+ * 出错的「地址」是你访问的路径，调用栈是这个站的渲染路径。
+ * 底下留了正常的返回链接，别让人真的以为站挂了。
+ */
 import Base from '@/layouts/Base.astro';
 import { url } from '@/lib/url';
-
 ---
 
 <Base title="404" description="This page does not exist.">
-  <div class="notfound">
-    <p class="code">404</p>
-    <h1>This page doesn't exist.</h1>
-    <p>
-      It may have moved, or the link may be wrong. Try the
-      <a href={url("/blog/")}>archive</a> or head <a href={url("/")}>home</a>.
+  <div class="oops">
+    <pre class="dmesg"><code><span class="ts">[    0.000000]</span> Unable to handle kernel paging request at virtual address <span class="addr" id="oops-addr">0xffff000000000000</span>
+<span class="ts">[    0.000000]</span> Mem abort info:
+<span class="ts">[    0.000000]</span>   ESR = 0x0000000096000004
+<span class="ts">[    0.000000]</span>   EC = 0x25: DABT (current EL), IL = 32 bits
+<span class="ts">[    0.000000]</span>   SET = 0, FnV = 0
+<span class="ts">[    0.000000]</span>   EA = 0, S1PTW = 0
+<span class="ts">[    0.000000]</span>   FSC = 0x04: level 0 translation fault
+<span class="ts">[    0.000000]</span> Data abort info:
+<span class="ts">[    0.000000]</span>   ISV = 0, ISS = 0x00000004, ISS2 = 0x00000000
+<span class="ts">[    0.000000]</span> <span class="err">Internal error: Oops: 0000000096000004 [#1] SMP</span>
+<span class="ts">[    0.000000]</span> Modules linked in: astro(O) shiki(O) katex(O) fira_sans(O)
+<span class="ts">[    0.000000]</span> CPU: 0 PID: 404 Comm: httpd Tainted: G           O
+<span class="ts">[    0.000000]</span> Hardware name: wheatfox.dev static site (DT)
+<span class="ts">[    0.000000]</span> pc : route_lookup+0x194/0x404
+<span class="ts">[    0.000000]</span> lr : render_page+0x28/0x1f4
+<span class="ts">[    0.000000]</span> sp : ffff800008003b40
+<span class="ts">[    0.000000]</span> x29: ffff800008003b40 x28: 0000000000000000 x27: 0000000000000404
+<span class="ts">[    0.000000]</span> x26: ffff0000c0de0000 x25: 0000000000000000 x24: ffff0000badc0ffe
+<span class="ts">[    0.000000]</span> Call trace:
+<span class="ts">[    0.000000]</span>  route_lookup+0x194/0x404
+<span class="ts">[    0.000000]</span>  render_page+0x28/0x1f4
+<span class="ts">[    0.000000]</span>  handle_request+0xbc/0x2a0
+<span class="ts">[    0.000000]</span>  http_worker+0x74/0x120
+<span class="ts">[    0.000000]</span>  kthread+0x11c/0x128
+<span class="ts">[    0.000000]</span> Code: d503201f a9bf7bfd 910003fd f9000bf3 (f9400260)
+<span class="ts">[    0.000000]</span> <span class="err">---[ end trace 0000000000000404 ]---</span>
+<span class="ts">[    0.000000]</span> Kernel panic - not syncing: Attempted to read a page that was never written.</code></pre>
+
+    <p class="recover">
+      The system is fine — that address just isn't mapped. Head
+      <a href={url('/')}>home</a> or browse the
+      <a href={url('/blog/')}>blog</a>.
     </p>
   </div>
 </Base>
 
+<script>
+  // 把真实访问的路径塞进「出错地址」，比写死一个假地址有意思
+  const el = document.getElementById('oops-addr');
+  if (el) el.textContent = location.pathname;
+</script>
+
 <style>
-  .notfound { max-width: var(--w-prose); padding: var(--sp-8) 0; }
-  .code {
-    font-family: var(--font-mono); font-size: var(--fs-sm);
-    color: var(--text-faint); letter-spacing: 0;
-    margin: 0 0 var(--sp-3);
+  .oops { max-width: 100%; }
+
+  .dmesg {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    line-height: 1.55;
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    padding: var(--sp-4);
+    margin: 0 0 var(--sp-5);
+    /* 长行自己横向滚，别把页面撑宽 */
+    overflow-x: auto;
+    white-space: pre;
   }
-  .notfound h1 {
-    font-family: var(--font-sans); font-size: var(--fs-h1);
-    font-weight: var(--fw-semibold); letter-spacing: var(--ls-tight);
-    color: var(--text); margin: 0 0 var(--sp-4);
-  }
-  .notfound p:last-child {
-    color: var(--text-muted); font-family: var(--font-sans); font-size: var(--fs-prose);
+  .dmesg code { background: none; border: 0; padding: 0; font-size: inherit; }
+
+  .ts   { color: var(--text-faint); }
+  .addr { color: var(--link); }
+  .err  { color: #c0392b; font-weight: var(--fw-bold); }
+  :root[data-theme='dark'] .err { color: #ff6b6b; }
+
+  .recover {
+    max-width: var(--w-prose);
+    color: var(--text-muted);
+    font-size: var(--fs-base);
   }
 </style>
