@@ -79,7 +79,7 @@ draft: false        # true 则不出现在列表 / RSS / sitemap
 数学公式直接写 `$x^2$` 和 `$$...$$`，构建期用 KaTeX 渲染成 HTML，页面上零 JS。
 代码块自动双主题高亮，跟随站点亮暗色切换。
 
-URL 规则是 `/posts/<slug>/`，改 `src/lib/posts.ts` 的 `postUrl()` 就能全站改掉。
+URL 规则是 `/blog/<slug>/`（中文版 `/zh/blog/<slug>/`），改 `src/lib/posts.ts` 的 `postUrl()` 就能全站改掉。
 
 ## 加一篇论文 / 一个项目
 
