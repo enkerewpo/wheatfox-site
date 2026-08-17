@@ -7,6 +7,7 @@
  * 一页全列出，Ctrl+F 就能找。超过 200 篇再说。
  */
 import Base from '@/layouts/Base.astro';
+import { url } from '@/lib/url';
 import PostList from '@/components/PostList.astro';
 import { getPosts, groupByYear } from '@/lib/posts';
 
@@ -21,7 +22,7 @@ const years = groupByYear(posts);
     Notes on operating systems, hypervisors, Rust, and whatever else I'm reading.
     <br />
     {posts.length} posts across {years.length} years.
-    <a href="/tags/">Browse by tag</a> or <a href="/rss.xml">subscribe</a>.
+    <a href={url("/tags/")}>Browse by tag</a> or <a href={url("/rss.xml")}>subscribe</a>.
   </p>
 
   {years.map(({ year, posts }) => (

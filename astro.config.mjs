@@ -7,8 +7,15 @@ import rehypeKatex from 'rehype-katex';
 
 import { site } from './src/config.ts';
 
+/**
+ * 预发布走子路径：BASE=/preview/ pnpm build
+ * 正式部署在域名根目录，不用设 BASE。
+ */
+const base = process.env.BASE || undefined;
+
 export default defineConfig({
   site: site.url,
+  base,
   trailingSlash: 'always',
 
 

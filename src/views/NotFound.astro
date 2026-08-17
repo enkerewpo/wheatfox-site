@@ -1,5 +1,6 @@
 ---
 import Base from '@/layouts/Base.astro';
+import { url } from '@/lib/url';
 
 ---
 
@@ -9,7 +10,7 @@ import Base from '@/layouts/Base.astro';
     <h1>This page doesn't exist.</h1>
     <p>
       It may have moved, or the link may be wrong. Try the
-      <a href="/blog/">archive</a> or head <a href="/">home</a>.
+      <a href={url("/blog/")}>archive</a> or head <a href={url("/")}>home</a>.
     </p>
   </div>
 </Base>

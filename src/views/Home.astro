@@ -11,6 +11,7 @@
  * 不在还没攒够的论文列表里。
  */
 import Base from '@/layouts/Base.astro';
+import { url } from '@/lib/url';
 import Publication from '@/components/Publication.astro';
 import { pagination } from '@/config';
 import { getPosts, postUrl, formatDate } from '@/lib/posts';
@@ -96,7 +97,7 @@ const description = bio[0].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
       ))}
     </ul>
     <p class="more">
-      <a href={"/open-source/"}>Upstream contributions →</a>
+      <a href={url("/open-source/")}>Upstream contributions →</a>
     </p>
   </section>
 
@@ -108,7 +109,7 @@ const description = bio[0].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
         <Publication pub={pub} index={publications.length - i} />
       ))}
     </ol>
-    <p class="more"><a href="/publications/">All publications →</a></p>
+    <p class="more"><a href={url("/publications/")}>All publications →</a></p>
   </section>
 
   {/* ---------- 近期文章 ---------- */}
@@ -127,7 +128,7 @@ const description = bio[0].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
       ))}
     </ul>
     <p class="more">
-      <a href={"/blog/"}>All {posts.length} posts →</a>
+      <a href={url("/blog/")}>All {posts.length} posts →</a>
     </p>
   </section>
 

@@ -199,3 +199,21 @@
   padding: 0.1em 0.4em;
   background: var(--bg-subtle);
 }
+
+/* --------------------------------------------------------------------------
+   代码高亮的暗色版本
+   Shiki 双主题会把暗色值写成 --shiki-dark-* 自定义属性，但默认不生效，
+   必须自己在暗色下把它们取出来用。不写这段，暗色页面里代码块还是浅色的。
+   -------------------------------------------------------------------------- */
+:root[data-theme='dark'] .astro-code,
+:root[data-theme='dark'] .astro-code span {
+  color: var(--shiki-dark) !important;
+  background-color: var(--shiki-dark-bg) !important;
+  font-style: var(--shiki-dark-font-style) !important;
+  font-weight: var(--shiki-dark-font-weight) !important;
+  text-decoration: var(--shiki-dark-text-decoration) !important;
+}
+/* 代码块外框跟着站点边框走，别让 Shiki 的背景把圆角吃掉 */
+:root[data-theme='dark'] .prose pre.astro-code {
+  border-color: var(--border);
+}

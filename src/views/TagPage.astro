@@ -2,6 +2,7 @@
 import Base from '@/layouts/Base.astro';
 import PostList from '@/components/PostList.astro';
 import type { Post } from '@/lib/posts';
+import { url } from '@/lib/url';
 
 interface Props {
   tag: string;
@@ -14,7 +15,7 @@ const count = `${posts.length} post${posts.length === 1 ? '' : 's'}`;
 ---
 
 <Base title={`Tag: ${tag}`} description={`${count} tagged “${tag}”.`}>
-  <p class="crumb"><a href={"/tags/"}>← All tags</a></p>
+  <p class="crumb"><a href={url("/tags/")}>← All tags</a></p>
   <h1 class="page-title">{tag}</h1>
   <p class="page-lede">{count}</p>
 

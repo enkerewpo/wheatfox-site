@@ -1,5 +1,6 @@
 ---
 import Base from '@/layouts/Base.astro';
+import { url } from '@/lib/url';
 import { getTags, tagSlug } from '@/lib/posts';
 
 const tags = await getTags();
@@ -12,7 +13,7 @@ const tags = await getTags();
   <ul class="tag-cloud">
     {tags.map(({ tag, count }) => (
       <li>
-        <a href={`/tags/${tagSlug(tag)}/`}>
+        <a href={url(`/tags/${tagSlug(tag)}/`)}>
           {tag}<span class="count">{count}</span>
         </a>
       </li>

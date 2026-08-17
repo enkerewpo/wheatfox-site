@@ -147,7 +147,7 @@ tags:
 <!-- ![](./quartz_001_01.mp4) -->
 
 <video style="border-radius: 15px; overflow: hidden;" width="100%" height="100%" controls>
-  <source src="/2024/07/28/microcomputer-learning/quartz_001_01.mp4" type="video/mp4">
+  <source src="/media/quartz_001_01.mp4" type="video/mp4">
 </video>
 
 [51单片机之串口通信详解及代码示例](https://blog.csdn.net/didi_ya/article/details/124289688)

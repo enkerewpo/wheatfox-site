@@ -1,5 +1,6 @@
 ---
 import { site, images } from '@/config';
+import { url } from '@/lib/url';
 import Sidebar from '@/components/Sidebar.astro';
 import Footer from '@/components/Footer.astro';
 
@@ -53,15 +54,15 @@ const ogImageUrl = new URL(ogImage, base).href;
     <link rel="canonical" href={canonical} />
 
 
-    <link rel="icon" href={images.favicon} />
-    <link rel="apple-touch-icon" href={images.appleTouchIcon} />
+    <link rel="icon" href={url(images.favicon)} />
+    <link rel="apple-touch-icon" href={url(images.appleTouchIcon)} />
     <link
       rel="alternate"
       type="application/rss+xml"
       title={site.title}
-      href="/rss.xml"
+      href={url("/rss.xml")}
     />
-    <link rel="sitemap" href="/sitemap-index.xml" />
+    <link rel="sitemap" href={url("/sitemap-index.xml")} />
 
     <meta property="og:type" content={ogType} />
     <meta property="og:title" content={title ?? site.title} />
@@ -74,7 +75,7 @@ const ogImageUrl = new URL(ogImage, base).href;
     )}
     <meta name="twitter:card" content="summary_large_image" />
 
-    <link rel="stylesheet" href="/katex/katex.min.css" />
+    <link rel="stylesheet" href={url("/katex/katex.min.css")} />
 
     {/*
       主题初始化必须在首次绘制前同步执行，否则暗色用户会看到一帧白闪。

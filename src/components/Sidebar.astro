@@ -6,6 +6,7 @@
  * 每一页都带着身份，右边内容列也能铺开。al-folio、AcademicPages 都是这个布局。
  */
 import { nav, images } from '@/config';
+import { url } from '@/lib/url';
 import { profile, emails, academicIds, socials } from '@/data/profile';
 
 const path = Astro.url.pathname;
@@ -19,10 +20,10 @@ const primarySocials = socials.slice(0, 2);
 ---
 
 <aside class="sidebar">
-  <a class="sidebar-portrait" href="/">
+  <a class="sidebar-portrait" href={url("/")}>
     <img
       class="sidebar-avatar"
-      src={images.avatar}
+      src={url(images.avatar)}
       alt={`Portrait of ${profile.name}`}
       width="148"
       height="148"
@@ -54,7 +55,7 @@ const primarySocials = socials.slice(0, 2);
   <div class="sidebar-nav-wrap">
     <nav class="site-nav" aria-label="Main">
       {nav.map((item) => (
-        <a href={item.href} aria-current={isCurrent(item.href) ? 'page' : undefined}>
+        <a href={url(item.href)} aria-current={isCurrent(item.href) ? 'page' : undefined}>
           {item.label}
         </a>
       ))}

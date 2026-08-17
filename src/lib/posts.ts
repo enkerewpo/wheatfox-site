@@ -1,4 +1,5 @@
 import { getCollection, type CollectionEntry } from 'astro:content';
+import { url } from './url';
 
 export type Post = CollectionEntry<'posts'>;
 
@@ -10,7 +11,7 @@ export async function getPosts(): Promise<Post[]> {
 
 /** 文章 URL。permalink 规则改这里，全站跟着变。 */
 export function postUrl(post: Post): string {
-  return `/blog/${post.id}/`;
+  return url(`/blog/${post.id}/`);
 }
 
 /** 统计每个 tag 下的文章数，按数量倒序、同数量按字母序。 */
