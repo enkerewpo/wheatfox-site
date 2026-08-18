@@ -240,11 +240,26 @@ export function solveArm(base: Pose2, target: Pose): ArmSolution | ArmFailure {
     落在合法区间内的距离，看上去像 bug。
   */
   if (Math.abs(lateral) > 0.26) {
+    /*
+      转向的符号必须和 chassis/move 一致，否则规划器会被带进死循环。
+
+      推导：机器人正前方是 (sin yaw, cos yaw)，chassisMove 做的是
+      `rotation.y += rotate_deg`，所以**增大** yaw 会把正前方从 +z 转向 +x。
+      而 lateral = dx·cos yaw − dz·sin yaw，在 yaw=0 时就是 dx —— 目标在 +x
+      侧则 lateral > 0。两者合起来：bearing 为正就该发正的 rotate_deg。
+
+      这里曾经写成 -bearingDeg。模型每次都严格照做，于是每转一次就往反方向
+      多偏同样的角度，误差 18° → 36° → 72° → 144° 精确翻倍，一路转到放弃。
+      那不是模型笨，是我给的指令自相矛盾。改这里就要重新验一遍 chassisMove。
+
+      左右也跟着定：+x 是机器人的左手边（three.js 里 +y 朝上、面向 +z 时，
+      right = forward × up = -x），所以 bearing 为正是「偏左」。
+    */
     return {
       reason: 'off_axis',
       detail: `the target is ${Math.abs(bearingDeg).toFixed(0)}° off to the `
-        + `${bearingDeg > 0 ? 'right' : 'left'} of the arm, which only reaches straight ahead. `
-        + `Send chassis/move with rotate_deg=${(-bearingDeg).toFixed(0)} to face it, then try again.`,
+        + `${bearingDeg > 0 ? 'left' : 'right'} of the arm, which only reaches straight ahead. `
+        + `Send chassis/move with rotate_deg=${bearingDeg.toFixed(0)} to face it, then try again.`,
     };
   }
 

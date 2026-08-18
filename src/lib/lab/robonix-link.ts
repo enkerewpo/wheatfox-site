@@ -95,6 +95,26 @@ export function makeHandlers(world: LabWorld): Record<string, Handler> {
       return { x: p.position.x, y: p.position.y, z: p.position.z };
     },
 
+    /* -------------------------------------------------------- camera */
+
+    /**
+     * robonix/primitive/camera/snapshot
+     *
+     * 这一帧是**真的会进模型**的：pilot 认 sensor_msgs/Image 的形状，
+     * 把 base64 转成一条 vision 消息发给 VLM，工具历史里只留一行占位。
+     * 所以质量压到 0.6、尺寸交给渲染目标（512×384）—— 够看清屋里有什么，
+     * 又不至于让每次调用都传半兆。
+     */
+    'camera.snapshot': () => {
+      const url = world.captureRobotView(0.6);
+      return {
+        data: url.split(',')[1] ?? '',
+        format: 'jpeg',
+        width: 512,
+        height: 384,
+      };
+    },
+
     /* ---------------------------------------------------- navigation */
 
     'navigation.navigate': (a) => world.navigate({
@@ -278,6 +298,11 @@ export class RobonixLink {
   /** 三条都在线才算这具身体真的接上了 */
   get online(): boolean {
     return ['sim', 'nav', 'scene'].every((n) => this.states.get(n) === 'online');
+  }
+
+  /** 有 provider 说「已经被别人占了」—— 排队，不是连不上 */
+  get busy(): boolean {
+    return ['sim', 'nav', 'scene'].some((n) => this.states.get(n) === 'busy');
   }
 }
 

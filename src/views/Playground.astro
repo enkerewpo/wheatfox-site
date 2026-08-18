@@ -8,7 +8,6 @@
  */
 import Base from '@/layouts/Base.astro';
 import RobonixMark from '@/components/RobonixMark.astro';
-import { PROVENANCE as P } from '@/lib/lab/provenance';
 import { url } from '@/lib/url';
 ---
 
@@ -157,55 +156,18 @@ import { url } from '@/lib/url';
         Demos like this are easy to be vague about, so here is the exact provenance.
       </p>
     </div>
-    <dl class="prov">
-      <div>
-        <dt>Model</dt>
-        <dd>
-          <strong class="prov-model">{P.vlm.model}</strong>
-          <span class="prov-dim">{P.vlm.vendor} · {P.vlm.modalities}</span>
-          <span class="prov-dim">{P.vlm.endpoint}</span>
-        </dd>
-      </div>
-      <div>
-        <dt>Robonix</dt>
-        <dd>
-          <a href={P.robonix.repo}>{P.robonix.version}</a>
-          <span class="prov-dim">{P.robonix.commit} · {P.robonix.date}</span>
-        </dd>
-      </div>
-      <div>
-        <dt>Components</dt>
-        <dd>{P.components.join(' · ')}</dd>
-      </div>
-      <div>
-        <dt>Host</dt>
-        <dd>{P.host.name} <span class="prov-dim">{P.host.arch}</span></dd>
-      </div>
-      <div>
-        <dt>OS</dt>
-        <dd>{P.host.distro} <span class="prov-dim">kernel {P.host.kernel}</span></dd>
-      </div>
-      <div>
-        <dt>Toolchain</dt>
-        <dd>rustc {P.host.rustc} <span class="prov-dim">· python {P.host.python}</span></dd>
-      </div>
-      <div>
-        <dt>Browser</dt>
-        <dd>
-          {P.browserRole}
-          <ul class="prov-providers">
-            {P.browserProviders.map((p) => (
-              <li>
-                <code>{p.id}</code>
-                <span class="prov-layer">{p.layer}</span>
-                <span class="prov-dim">{p.caps} caps · {p.note}</span>
-              </li>
-            ))}
-          </ul>
-        </dd>
-      </div>
+    <!--
+      这张表**不写死任何东西**。数据来自 /robonix/status，那是网关现查的：
+      模型和端点来自 pilot 的进程环境，版本来自 robonix 源码树的 git，
+      主机和工具链来自系统，provider 和能力列表来自 `rbnx caps -v` ——
+      也就是 Atlas 此刻真正注册着的东西。
+
+      以前这里是一组前端常量，换个模型、加一个能力，页面还在说旧的。
+      一个宣称「跑的是真东西」的 demo，最不该骗人的就是这张表。
+    -->
+    <dl class="prov" id="prov-table">
+      <div><dt>Model</dt><dd class="prov-dim">reading from the runtime…</dd></div>
     </dl>
-    <p class="prose prov-role">{P.vlm.role}</p>
     <p class="prov-note" id="prov-note"></p>
   </section>
 </Base>
@@ -222,9 +184,19 @@ import { url } from '@/lib/url';
   import { sfx, setSfxEnabled, sfxEnabled, unlockAudioOnce } from '@/lib/lab/sfx';
   import { RobonixLink, defaultLinkBase } from '@/lib/lab/robonix-link';
   import { AgentClient, type AgentEvent } from '@/lib/lab/agent-client';
-  // 模型名只有一处真相：provenance。页面上写死过一次，换模型时就对不上了。
-  import { PROVENANCE } from '@/lib/lab/provenance';
-  const VLM_MODEL = PROVENANCE.vlm.model;
+  /*
+    模型名和 provenance 全部来自运行时，不在前端留任何常量。
+    /robonix/status 是网关现查的：pilot 实际用的模型、robonix 的 git 版本、
+    主机与工具链、以及 Atlas 此刻注册着的 provider 和能力。
+  */
+  type RuntimeStatus = {
+    vlm: { model: string | null; endpoint: string | null };
+    robonix: { version: string | null; commit: string | null; date: string | null; repo: string };
+    host: Record<string, string | null>;
+    providers: { id: string; state: string; namespace: string;
+                 capabilities: { contract: string; transport: string }[] }[];
+  };
+  let VLM_MODEL = '…';
 
   const EXAMPLES = [
     'Cook me dinner',
@@ -325,6 +297,20 @@ import { url } from '@/lib/url';
             + 'as browser_sim (primitive), browser_nav (service) and browser_scene (system), so '
             + 'the robot you see is a real capability provider rather than a viewer.';
         }
+      } else if (link.busy) {
+        /*
+          全世界只有一具身体。别人正开着的时候，如实说「有人在开」——
+          之前这里一律显示成 local fallback，把「排队」说成了「连不上」，
+          完全是两回事。
+        */
+        modeEl.textContent = 'another visitor is driving';
+        modeEl.classList.remove('is-live');
+        modeEl.title =
+          'The runtime is up, but there is only one robot and someone else is '
+          + 'attached to it right now. This page falls back to a local planner until '
+          + 'they leave; it reconnects on its own.';
+        if (provNote) provNote.textContent = '';
+        return;
       } else {
         const why = !link.online
           ? 'the robot body could not attach to the runtime'
@@ -341,6 +327,62 @@ import { url } from '@/lib/url';
         }
       }
     }
+    /* ---------------------------------------------- 运行时自述
+       把 /robonix/status 的内容画进那张表。拿不到就如实说拿不到 ——
+       与其显示一份可能已经过时的常量，不如承认此刻读不到运行时。 */
+    async function loadProvenance() {
+      const table = document.getElementById('prov-table');
+      const note = document.getElementById('prov-note');
+      if (!table) return;
+      try {
+        const r = await fetch('/robonix/status', { cache: 'no-store' });
+        if (!r.ok) throw new Error(`status ${r.status}`);
+        const st: RuntimeStatus = await r.json();
+
+        VLM_MODEL = st.vlm.model ?? 'unknown';
+        refreshMode();
+
+        const row = (k: string, v: string) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
+        const dim = (t: string) => `<span class="prov-dim">${esc(t)}</span>`;
+        const h = st.host;
+
+        table.innerHTML =
+          row('Model',
+            `<strong class="prov-model">${esc(st.vlm.model ?? 'unknown')}</strong>` +
+            (st.vlm.endpoint ? dim(st.vlm.endpoint) : '')) +
+          row('Robonix',
+            `<a href="${st.robonix.repo}">v${esc(st.robonix.version ?? '?')}</a> ` +
+            dim([st.robonix.commit, st.robonix.date].filter(Boolean).join(' · '))) +
+          row('Host', `${esc(h.name ?? '?')} ${dim(h.arch ?? '')}`) +
+          row('OS', `${esc(h.distro ?? '?')} ${dim('kernel ' + (h.kernel ?? '?'))}`) +
+          row('Toolchain', `rustc ${esc(h.rustc ?? '?')} ${dim('· python ' + (h.python ?? '?'))}`) +
+          row('Browser',
+            'the capability providers this page registers with Atlas' +
+            '<ul class="prov-providers">' +
+            st.providers.map((pr) =>
+              `<li><code>${esc(pr.id)}</code>` +
+              `<span class="prov-layer">${esc(pr.namespace.split('/')[1] ?? '')}</span>` +
+              dim(`${pr.capabilities.length} caps · ` +
+                  pr.capabilities.map((c) => c.contract.split('/').slice(-2).join('/')).join(', ')) +
+              '</li>').join('') +
+            '</ul>');
+
+        if (note) {
+          note.textContent =
+            'Everything above is read from the running system when this page loads — '
+            + 'the model pilot is actually configured with, the git revision of the runtime, '
+            + 'and the providers Atlas has registered right now. Nothing here is hard-coded '
+            + 'in the page.';
+        }
+      } catch (e) {
+        table.innerHTML =
+          '<div><dt>Runtime</dt><dd class="prov-dim">not reachable from this page right now, '
+          + 'so there is nothing honest to report here.</dd></div>';
+        if (note) note.textContent = '';
+      }
+    }
+    loadProvenance();
+
     refreshMode();
     link.start();
     agent.connect();
