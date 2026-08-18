@@ -53,13 +53,27 @@ export const C = {
 export const ROOM = { w: 8, d: 7, wall: 2.7 } as const;
 
 export const FURNITURE: Furniture[] = [
-  // ---- 厨房沿后墙一字排开 ----
+  /* ---- 厨房沿后墙一字排开 ----
+     台面要**开洞**给水槽和灶台，不能整条铺过去再把它们叠在上面：
+     之前 worktop 和 stove-top 顶面都在 y=0.91、完全共面，渲染出来就是
+     两个面在同一深度上打架（z-fighting），看着像灶台陷进桌子里。
+     水槽同理，整个盆都埋在台面里。
+
+     现在台面切成三段，中间让开 sink(x -2.68…-1.92) 和 hob(x 0.16…0.94)：
+     水槽落进洞里、灶台略高出台面一点点，和真厨房一样。 */
   { id: 'counter-run', size: [4.6, 0.86, 0.62], pos: [-1.0, 0.43, -2.9], color: C.counter, surface: false },
-  { id: 'worktop',     size: [4.7, 0.05, 0.66], pos: [-1.0, 0.885, -2.9], color: C.worktop, surface: true },
+  { id: 'worktop-l',   size: [0.67, 0.05, 0.66], pos: [-3.015, 0.885, -2.9], color: C.worktop, surface: true },
+  { id: 'worktop',     size: [2.08, 0.05, 0.66], pos: [-0.88, 0.885, -2.9], color: C.worktop, surface: true },
+  { id: 'worktop-r',   size: [0.41, 0.05, 0.66], pos: [1.145, 0.885, -2.9], color: C.worktop, surface: true },
 
-  { id: 'stove-body',  size: [0.76, 0.86, 0.62], pos: [0.55, 0.43, -2.9], color: C.stove, surface: false },
-  { id: 'stove-top',   size: [0.78, 0.05, 0.64], pos: [0.55, 0.885, -2.9], color: 0x2b2825, surface: true },
+  /* 灶具是**嵌入式**的，不该有自己的柜体。
+     之前 stove-body 和 counter-run 是两个同高同深、位置重叠的盒子，
+     深色灶台整个埋在白色柜子里 —— 那就是「灶台陷在桌子里」的真正原因。
+     现在只留台面开口里的灶面板，再在柜门位置贴一块深色板当烤箱门。 */
+  { id: 'stove-top',   size: [0.76, 0.05, 0.60], pos: [0.55, 0.90, -2.9], color: 0x2b2825, surface: true },
+  { id: 'oven-door',   size: [0.72, 0.62, 0.03], pos: [0.55, 0.42, -2.573], color: C.stove, surface: false },
 
+  // 水槽落在台面的开口里，盆口和台面齐平
   { id: 'sink-basin',  size: [0.68, 0.16, 0.46], pos: [-2.3, 0.83, -2.9], color: C.metal, surface: true },
 
   { id: 'fridge',      size: [0.82, 1.85, 0.72], pos: [2.35, 0.925, -2.85], color: C.fridge, surface: false },

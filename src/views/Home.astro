@@ -11,6 +11,7 @@
  * 不在还没攒够的论文列表里。
  */
 import Base from '@/layouts/Base.astro';
+import ProjectLogo from '@/components/ProjectLogo.astro';
 import { url } from '@/lib/url';
 import Publication from '@/components/Publication.astro';
 import LifePanel from '@/components/LifePanel.astro';
@@ -105,6 +106,7 @@ const description = bio[0].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
       {projects.map((p) => (
         <li>
           <div class="proj-head">
+            <ProjectLogo name={p.name} />
             <a class="proj-name" href={p.href} target="_blank" rel="noopener">{p.name}</a>
             <span class="proj-role">{p.role}</span>
             <span class="proj-period">{p.period}</span>
@@ -268,7 +270,8 @@ const description = bio[0].replace(/<[^>]+>/g, '').replace(/\s+/g, ' ').trim();
   .projects > li:last-child { border-bottom: 0; }
   .proj-head {
     display: flex;
-    align-items: baseline;
+    /* 标记是块级图形，跟基线对齐会掉下去半个；这里按居中 */
+    align-items: center;
     flex-wrap: wrap;
     gap: var(--sp-2) var(--sp-3);
     margin-bottom: var(--sp-2);

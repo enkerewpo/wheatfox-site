@@ -7,60 +7,92 @@
  * pilot / executor —— 连不上时才退回本地兜底，页面永远不会是死屏。
  */
 import Base from '@/layouts/Base.astro';
+import RobonixMark from '@/components/RobonixMark.astro';
 import { PROVENANCE as P } from '@/lib/lab/provenance';
+import { url } from '@/lib/url';
 ---
 
 <Base
+  bare
   title="Robonix Playground"
   description="A browser-side robot body for Robonix: typed capabilities, a live RTDL plan tree, and a robot that actually does the chore."
 >
-  <h1 class="page-title">Robonix Playground</h1>
-  <p class="page-lede">
-    The browser is the robot's <b>body</b> — it provides the chassis, arm, camera and
-    speaker as <a href="https://github.com/syswonder/robonix">Robonix</a> capabilities.
-    Planning and execution belong to the runtime; this page shows you the plan tree it
-    produces and runs. Ask it to do a chore — any language works.
+  <!--
+    顶栏。这一页是无侧栏的整块工作区（Base 的 bare），所以返回主页的路
+    要自己留一条；右边放 Robonix 的字标和仓库链接 —— 页面里跑的就是它。
+  -->
+  <header class="pg-top">
+    <a class="pg-back" href={url('/')}>
+      <span class="pg-back-arrow" aria-hidden="true">←</span> wheatfox
+    </a>
+    <h1 class="pg-title">Robonix Playground</h1>
+    <div class="pg-links">
+      <a class="pg-mark" href="https://github.com/syswonder/robonix"
+         title="Robonix on GitHub" aria-label="Robonix on GitHub">
+        <RobonixMark />
+      </a>
+      <a class="pg-gh" href="https://github.com/syswonder/robonix" aria-label="GitHub repository">
+        <svg viewBox="0 0 16 16" width="18" height="18" aria-hidden="true" fill="currentColor">
+          <path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"/>
+        </svg>
+      </a>
+    </div>
+  </header>
+
+  <p class="pg-lede">
+    The browser is the robot's <b>body</b>: this page registers with Robonix as three
+    capability providers, so every motion you see is a real executor dispatch.
+    Ask it to do a chore — and send another message while it works to steer it.
   </p>
 
-  <div class="lab" id="lab">
-    <div class="lab-stage">
-      <canvas id="lab-canvas"></canvas>
-      <div class="bubble" id="lab-bubble" hidden></div>
-      <div class="lab-hud" id="lab-hud" hidden><span class="lab-hud-dot"></span><span id="lab-hud-text"></span></div>
-      <button class="lab-mute" id="lab-mute" type="button" title="Mute sound effects" aria-label="Mute sound effects">♪</button>
-      <div class="lab-cam-float">
-        <span class="lab-cam-tag">robot camera</span>
-        <img id="lab-cam-img" alt="What the robot sees" />
+  <!--
+    工作区：左边 3D，右边一条时间线。
+
+    之前是上下排布，看机器人动要往上滚、看计划要往下滚 —— 而这个 demo
+    最值得看的恰恰是两者的对应关系。现在左列 sticky，右列按时间排下来：
+    你说的话、模型正在想的、它给出的 RTDL 计划卡片，卡片上的节点状态
+    随执行实时变色。
+  -->
+  <div class="pg-work">
+    <div class="pg-stage-col">
+      <div class="lab-stage" id="lab">
+        <canvas id="lab-canvas"></canvas>
+        <div class="bubble" id="lab-bubble" hidden></div>
+        <div class="lab-hud" id="lab-hud" hidden><span class="lab-hud-dot"></span><span id="lab-hud-text"></span></div>
+        <button class="lab-mute" id="lab-mute" type="button" title="Mute sound effects" aria-label="Mute sound effects">♪</button>
+        <div class="lab-cam-float">
+          <span class="lab-cam-tag">robot camera</span>
+          <img id="lab-cam-img" alt="What the robot sees" />
+        </div>
+        <p class="lab-nogl">
+          This demo needs WebGL, which this browser has turned off or can't start.
+          The conversation and plan tree still work.
+        </p>
       </div>
-      <p class="lab-nogl">
-        This demo needs WebGL, which this browser has turned off or can't start.
-        The plan tree below still works.
-      </p>
+
+      <form class="pg-ask" id="lab-ask">
+        <input
+          id="lab-input" type="text" autocomplete="off"
+          placeholder="Ask the robot to do a chore…"
+          aria-label="Ask the robot to do something" />
+        <button type="submit" id="lab-go">Send</button>
+      </form>
+      <p class="lab-examples" id="lab-examples"></p>
+
+      <section class="pg-world">
+        <h2>World <span class="lab-mode" id="lab-mode"></span></h2>
+        <pre class="lab-state" id="lab-state"></pre>
+      </section>
     </div>
 
-    <form class="lab-ask" id="lab-ask">
-      <input
-        id="lab-input" type="text" autocomplete="off"
-        placeholder="Cook me dinner…" aria-label="Ask the robot to do something" />
-      <button type="submit" id="lab-go">Run</button>
-    </form>
-
-    <p class="lab-examples" id="lab-examples"></p>
-    <p class="lab-note" id="lab-status">Ready.</p>
-  </div>
-
-  <div class="lab-panels">
-    <section class="lab-block lab-plan">
-      <h2>Plan <span class="lab-mode" id="lab-mode"></span></h2>
-      <div class="rtdl" id="lab-rtdl">
-        <p class="lab-empty">Ask for something and the plan tree appears here.</p>
+    <div class="pg-feed-col">
+      <div class="pg-feed" id="lab-feed">
+        <p class="pg-empty" id="lab-empty">
+          Ask the robot to do something. Its thinking, its plan, and every
+          capability call appear here as they happen.
+        </p>
       </div>
-    </section>
-
-    <section class="lab-block">
-      <h2>World</h2>
-      <pre class="lab-state" id="lab-state"></pre>
-    </section>
+    </div>
   </div>
 
   <section class="section">
@@ -183,7 +215,7 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
   import { makePrimitives, CATALOG } from '@/lib/lab/primitives';
   import { planLocally, runLocally } from '@/lib/lab/local-fallback';
   import {
-    renderEnvelope, renderNode, fromWirePlan, applyNodeState,
+    renderNode, fromWirePlan, applyNodeState,
     countLeaves, type RtdlEnvelope, type RtdlNode,
   } from '@/lib/lab/rtdl';
   import { OBJECTS, PLACES } from '@/lib/lab/scene-spec';
@@ -210,17 +242,13 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
     catch (e) {
       console.warn('[playground] WebGL unavailable:', e);
       document.getElementById('lab')?.classList.add('is-nogl');
-      const s = document.getElementById('lab-status');
-      if (s) s.textContent = 'WebGL unavailable — the 3D view is disabled.';
     }
   }
 
   function boot(canvas: HTMLCanvasElement) {
     const bubble   = document.getElementById('lab-bubble')!;
     const camImg   = document.getElementById('lab-cam-img') as HTMLImageElement;
-    const rtdlEl   = document.getElementById('lab-rtdl')!;
     const stateEl  = document.getElementById('lab-state')!;
-    const statusEl = document.getElementById('lab-status')!;
     const modeEl   = document.getElementById('lab-mode')!;
     const exEl     = document.getElementById('lab-examples')!;
     const form     = document.getElementById('lab-ask') as HTMLFormElement;
@@ -248,12 +276,12 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
     muteBtn.addEventListener('click', () => {
       const on = !sfxEnabled();
       setSfxEnabled(on);
+      if (!on) stopSpeaking();     // 按静音时把正在说的那句也掐掉
       muteBtn.textContent = on ? '♪' : '✕';
       muteBtn.classList.toggle('is-off', !on);
     });
     const prims = makePrimitives(world);
     let busy = false;
-    let env: RtdlEnvelope | null = null;
 
     /* ==================================================================
        接上真的 Robonix
@@ -317,9 +345,48 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
     link.start();
     agent.connect();
 
-    /* --------------------------------------------------------- 语音
-       用浏览器自带的 TTS，参数保持中性，优先保证**各平台都能出声**。
+    /* ========================================================== 语音
 
+       机器人说话优先走 GLaDOS —— 模型和推理来自 R2D2FISH/glados-tts，
+       跑在同一台 work_pc 上，一句大约 0.5 秒，命中缓存 6 毫秒。
+       连不上就回落到浏览器自带的 TTS：宁可声音普通，也不要一台哑巴机器人。
+
+       两个必须处理的坑：
+         · 自动播放策略。必须是用户交互之后才能出声 —— 页面上是「Send」
+           那一下，所以这里不需要额外的解锁，但失败了也不能抛。
+         · 上一句还没说完就来了下一句。直接打断，别让两句叠在一起。 */
+
+    const TTS_URL = '/robonix/tts';
+    let ttsOk = true;                 // 失败一次就不再重试，省得每句都等超时
+    let current: HTMLAudioElement | null = null;
+
+    function stopSpeaking() {
+      if (current) { current.pause(); current.src = ''; current = null; }
+      try { speechSynthesis.cancel(); } catch { /* 不支持就算了 */ }
+    }
+
+    async function speak(text: string) {
+      if (!sfxEnabled()) return;      // 静音按钮同时管音效和语音
+      stopSpeaking();
+
+      if (ttsOk) {
+        try {
+          const a = new Audio(`${TTS_URL}?text=${encodeURIComponent(text.slice(0, 220))}`);
+          a.preload = 'auto';
+          current = a;
+          await a.play();
+          return;
+        } catch (e) {
+          // 端点挂了或被限流 —— 记下来，之后直接走浏览器 TTS
+          console.warn('[playground] GLaDOS TTS unavailable, falling back:', e);
+          ttsOk = false;
+          current = null;
+        }
+      }
+      speakWithBrowser(text);
+    }
+
+    /* ---- 回落：浏览器自带 TTS ----
        跨平台的坑主要是两个，这里都处理了：
          · Chrome 的 getVoices() 首次是空的，要等 voiceschanged 事件；
            所以不在启动时锁定音色，而是每次说话时现取。
@@ -328,25 +395,21 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
            交给浏览器自己决定 —— 那一定是能用的。 */
     function pickVoice(): SpeechSynthesisVoice | null {
       const vs = speechSynthesis.getVoices();
-      if (!vs.length) return null;                 // 还没加载好，交给浏览器默认
+      if (!vs.length) return null;
       return vs.find((v) => /^en[-_]?US/i.test(v.lang) && v.localService)
           ?? vs.find((v) => /^en/i.test(v.lang) && v.localService)
           ?? vs.find((v) => /^en/i.test(v.lang))
           ?? null;
     }
 
-    function speak(text: string) {
+    function speakWithBrowser(text: string) {
       try {
         if (!('speechSynthesis' in window)) return;
         const u = new SpeechSynthesisUtterance(text);
         u.lang = 'en-US';
         const v = pickVoice();
-        if (v) u.voice = v;                        // 挑不到就用浏览器默认，不强求
-        // 中性参数：不做任何风格化，优先听清
-        u.rate = 1;
-        u.pitch = 1;
-        u.volume = 1;
-        speechSynthesis.cancel();
+        if (v) u.voice = v;
+        u.rate = 1; u.pitch = 1; u.volume = 1;
         speechSynthesis.speak(u);
       } catch {
         /* 不支持 TTS 的浏览器：气泡还在，功能不受影响 */
@@ -362,11 +425,155 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
       exEl.appendChild(b);
     });
 
-    /* --------------------------------------------------------- 渲染 */
-    function drawPlan() {
-      rtdlEl.innerHTML = env ? renderEnvelope(env) : '<p class="lab-empty">Ask for something.</p>';
+    /* ======================================================== 时间线
+       一条按时间排下来的流：你说的话、模型正在想的、它给出的 RTDL 计划。
+       计划不是渲染完就不动的图片 —— 卡片留在流里，节点状态随执行实时变色，
+       所以「树上哪一步在跑」和左边 3D 里在动什么是对得上的。 */
+
+    const feedEl  = document.getElementById('lab-feed')!;
+    const emptyEl = document.getElementById('lab-empty');
+
+    /** 用户没有往上翻的时候才自动贴底，否则会把人正在读的内容顶走 */
+    function atBottom() {
+      return feedEl.scrollHeight - feedEl.scrollTop - feedEl.clientHeight < 80;
+    }
+    function stick(wasAtBottom: boolean) {
+      if (wasAtBottom) feedEl.scrollTop = feedEl.scrollHeight;
     }
 
+    function addToFeed(el: HTMLElement) {
+      const b = atBottom();
+      emptyEl?.remove();
+      feedEl.appendChild(el);
+      stick(b);
+      return el;
+    }
+
+    function esc(s: string) {
+      return String(s).replace(/[&<>"]/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+    }
+
+    /** 你说的一句话。中途插的标成 steer */
+    function pushUser(text: string, steer = false) {
+      const el = document.createElement('div');
+      el.className = 'pg-msg is-user';
+      el.innerHTML =
+        `<div class="pg-who">you${steer ? '<span class="pg-steer-tag">steer</span>' : ''}</div>` +
+        `<div class="pg-bubble">${esc(text)}</div>`;
+      addToFeed(el);
+    }
+
+    /** 一行状态或错误。不做成气泡 —— 它不是「说的话」 */
+    function pushStatus(text: string, err = false) {
+      const el = document.createElement('div');
+      el.className = 'pg-status' + (err ? ' is-err' : '');
+      el.textContent = text;
+      addToFeed(el);
+    }
+
+    /* ---- 「正在想」那一行 ----
+       pilot 每规划一轮都会先发一条状态，而那段时间（qwen3-vl-plus 大约 8 秒）
+       页面上什么都不动，看着像卡死了。所以给它一行带动画的占位：
+       它只有一条、始终钉在流的末尾，计划一到就被真正的内容顶掉。
+       状态是会连着来好几条的，累积成一屏没人看的历史毫无意义。 */
+    let liveEl: HTMLElement | null = null;
+
+    function setLive(text: string) {
+      const b = atBottom();
+      if (!liveEl) {
+        liveEl = document.createElement('div');
+        liveEl.className = 'pg-status pg-live';
+        emptyEl?.remove();
+      }
+      liveEl.innerHTML =
+        `<span class="pg-dots"><i></i><i></i><i></i></span>` +
+        `<span class="pg-live-text"></span>`;
+      (liveEl.querySelector('.pg-live-text') as HTMLElement).textContent = text;
+      feedEl.appendChild(liveEl);          // 始终排在最后
+      stick(b);
+    }
+
+    function clearLive() {
+      liveEl?.remove();
+      liveEl = null;
+    }
+
+    /* ---- 模型正在想的那段字 ----
+       pilot 是流式吐字的。开一个气泡实时往里追加，末尾一个闪动的方块，
+       一轮结束就把光标去掉留在流里 —— 思考过程是这一页最该被看到的东西，
+       之前它被塞进一行状态里还截断到 160 字，等于扔了。 */
+    let thinkBubble: HTMLElement | null = null;
+    let thinkBody: HTMLElement | null = null;
+    let thinkText = '';
+
+    function pushThink(chunk: string) {
+      const b = atBottom();
+      if (!thinkBubble) {
+        thinkText = '';
+        thinkBubble = document.createElement('div');
+        thinkBubble.className = 'pg-msg is-agent';
+        thinkBubble.innerHTML =
+          '<div class="pg-who">robonix</div><div class="pg-bubble"></div>';
+        thinkBody = thinkBubble.querySelector('.pg-bubble');
+        addToFeed(thinkBubble);
+      }
+      thinkText += chunk;
+      thinkBody!.innerHTML = esc(thinkText) + '<span class="pg-caret"></span>';
+      stick(b);
+    }
+
+    function sealThink() {
+      if (thinkBubble && thinkBody) {
+        if (!thinkText.trim()) thinkBubble.remove();       // 一个字都没说就别留空壳
+        else thinkBody.innerHTML = esc(thinkText);         // 收掉光标
+      }
+      thinkBubble = null; thinkBody = null; thinkText = '';
+    }
+
+    /* ---- RTDL 卡片 ----
+       每一轮一张。plan 事件到了就建卡，node 事件到了就在卡里改状态。
+       按 op_id 找节点，因为下标只在本轮有效。 */
+    type PlanCard = { tree: RtdlNode; body: HTMLElement; head: HTMLElement };
+    const cards: PlanCard[] = [];
+
+    function pushPlan(e: Extract<AgentEvent, { kind: 'plan' }>) {
+      const tree = fromWirePlan(e as any);
+      if (!tree) return;
+      const el = document.createElement('div');
+      el.className = 'pg-plan';
+      const total = countLeaves(tree);
+      el.innerHTML =
+        `<div class="pg-plan-head">` +
+          `<span class="pg-plan-tag">RTDL</span>` +
+          `<span>round ${e.round}</span>` +
+          `<span class="pg-plan-count">0/${total}</span>` +
+        `</div>` +
+        `<div class="pg-plan-body rtdl"></div>`;
+      const body = el.querySelector('.pg-plan-body') as HTMLElement;
+      body.innerHTML = renderNode(tree);
+      addToFeed(el);
+      cards.push({ tree, body, head: el.querySelector('.pg-plan-count') as HTMLElement });
+    }
+
+    function applyNode(e: Extract<AgentEvent, { kind: 'node' }>) {
+      for (let i = cards.length - 1; i >= 0; i--) {
+        const c = cards[i];
+        if (!applyNodeState(c.tree, e)) continue;
+        const b = atBottom();
+        c.body.innerHTML = renderNode(c.tree);
+        c.head.textContent = `${countDone(c.tree)}/${countLeaves(c.tree)}`;
+        stick(b);
+        return;
+      }
+    }
+
+    function countDone(n: RtdlNode): number {
+      if (n.op === 'do') return n.status === 'succeeded' ? 1 : 0;
+      return n.children.reduce((a, c) => a + countDone(c), 0);
+    }
+
+    /* --------------------------------------------------------- 世界状态 */
     function drawState() {
       const s = world.snapshot();
       const rows = [
@@ -382,43 +589,31 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
       stateEl.textContent = rows.join('\n');
     }
 
-    /* ================================================== 服务器推来的计划 */
-
-    /*
-      pilot 每一轮都发一棵新树（它会边做边改计划），所以这里保留最近几轮，
-      让人看得到它是怎么改主意的 —— 那恰恰是这套系统最值得看的部分。
-    */
-    type Round = { round: number; say: string; tree: RtdlNode | null };
-    let rounds: Round[] = [];
-    let liveGoal = '';
-
-    function drawLivePlan() {
-      if (!rounds.length) {
-        rtdlEl.innerHTML = '<p class="lab-empty">Ask for something.</p>';
-        return;
-      }
-      const html = rounds.map((r) => {
-        const total = r.tree ? countLeaves(r.tree) : 0;
-        return (
-          (r.say ? `<p class="rt-say">${escapeHtml(r.say)}</p>` : '') +
-          `<div class="rt-head">` +
-            `<span class="rt-summary">round ${r.round}</span>` +
-            `<span class="rt-progress">${total} call${total === 1 ? '' : 's'}</span>` +
-          `</div>` +
-          (r.tree ? `<div class="rt-tree-body">${renderNode(r.tree)}</div>` : '')
-        );
-      }).join('');
-      rtdlEl.innerHTML = html +
-        (liveGoal ? `<p class="rt-goal"><span>goal</span> ${escapeHtml(liveGoal)}</p>` : '');
-      rtdlEl.scrollTop = rtdlEl.scrollHeight;
+    /* ---- 本地兜底的计划：同样进时间线，标清楚它不是运行时给的 ---- */
+    function pushLocalPlan(env: RtdlEnvelope) {
+      const el = document.createElement('div');
+      el.className = 'pg-plan';
+      el.innerHTML =
+        `<div class="pg-plan-head">` +
+          `<span class="pg-plan-tag">RTDL</span>` +
+          `<span>local fallback</span>` +
+          `<span class="pg-plan-count"></span>` +
+        `</div>` +
+        `<div class="pg-plan-body rtdl"></div>`;
+      const body = el.querySelector('.pg-plan-body') as HTMLElement;
+      const count = el.querySelector('.pg-plan-count') as HTMLElement;
+      const redraw = () => {
+        const b = atBottom();
+        body.innerHTML = renderNode(env.rtdl);
+        count.textContent = `${countDone(env.rtdl)}/${countLeaves(env.rtdl)}`;
+        stick(b);
+      };
+      redraw();
+      addToFeed(el);
+      return redraw;
     }
 
-    function escapeHtml(s: string) {
-      return String(s).replace(/[&<>"]/g, (c) =>
-        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
-    }
-
-    let pendingText = '';
+    /* ======================================================== 事件 */
 
     function onAgentEvent(e: AgentEvent) {
       switch (e.kind) {
@@ -426,43 +621,44 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
           break;
 
         case 'status':
-          statusEl.className = 'lab-note';
-          statusEl.textContent = e.message;
+          // turn_id 是内部标识，对读的人没有意义
+          if (e.message && !/^turn_id=/.test(e.message)) setLive(e.message);
           break;
 
         case 'text':
-          // pilot 是流式吐字的，攒到下一棵树出现时一并作为那一轮的开场白
-          pendingText += e.text;
-          statusEl.className = 'lab-note';
-          statusEl.textContent = pendingText.slice(-160);
+          clearLive();      // 开始说话了，占位行让位
+          pushThink(e.text);
           break;
 
-        case 'plan': {
-          rounds.push({ round: e.round, say: pendingText.trim(), tree: fromWirePlan(e as any) });
-          pendingText = '';
-          if (rounds.length > 6) rounds = rounds.slice(-6);
-          drawLivePlan();
+        case 'steer':
+          // 网关的回执：你插的话已经收到并送进了当前这一轮
+          pushUser(e.text, true);
           break;
-        }
 
-        case 'node': {
-          for (const r of rounds) {
-            if (r.tree && applyNodeState(r.tree, e)) break;
-          }
-          drawLivePlan();
+        case 'plan':
+          clearLive();
+          sealThink();
+          pushPlan(e);
+          break;
+
+        case 'node':
+          applyNode(e);
           drawState();
           break;
-        }
 
         case 'task':
-          liveGoal = e.goal;
-          drawLivePlan();
           break;
 
         case 'final':
+          clearLive();
+          sealThink();
           if (e.text) {
-            statusEl.className = 'lab-note';
-            statusEl.textContent = e.text;
+            const el = document.createElement('div');
+            el.className = 'pg-msg is-agent';
+            el.innerHTML =
+              '<div class="pg-who">robonix</div>' +
+              `<div class="pg-bubble">${esc(e.text)}</div>`;
+            addToFeed(el);
             bubble.textContent = e.text;
             bubble.hidden = false;
             speak(e.text);
@@ -471,12 +667,15 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
           break;
 
         case 'error':
-          statusEl.className = 'lab-note is-err';
-          statusEl.textContent = e.message;
+          clearLive();
+          sealThink();
+          pushStatus(e.message, true);
           sfx.reject();
           break;
 
         case 'idle':
+          clearLive();
+          sealThink();
           setBusy(false);
           break;
       }
@@ -484,63 +683,52 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
 
     function setBusy(b: boolean) {
       busy = b;
-      goBtn.disabled = b;
-      input.disabled = b;
-      if (!b) input.focus();
+      // 输入框**永远可用** —— 干活时打的字就是 steer，这是这一页的重点之一
+      goBtn.textContent = b ? 'Steer' : 'Send';
+      goBtn.classList.toggle('is-steer', b);
+      input.placeholder = b
+        ? 'Steer it mid-task…'
+        : 'Ask the robot to do a chore…';
     }
 
     /* --------------------------------------------------------- 执行 */
     async function submit(task: string) {
-      if (busy || !task.trim()) return;
+      if (!task.trim()) return;
+      input.value = '';
 
       /* ---- 真运行时 ---- */
       if (isLive()) {
-        rounds = [];
-        pendingText = '';
-        liveGoal = task;
-        drawLivePlan();
-        statusEl.className = 'lab-note';
-        statusEl.textContent = 'Sending to pilot…';
-        setBusy(true);
+        // busy 时这句是 steer，网关会回一条 steer 事件，气泡由那里补
+        if (!busy) pushUser(task);
         if (!agent.submit(task)) {
-          statusEl.className = 'lab-note is-err';
-          statusEl.textContent = 'Lost the connection to the planner. Falling back locally.';
-          setBusy(false);
+          pushStatus('Lost the connection to the planner — falling back locally.', true);
           refreshMode();
+          return;
         }
+        setBusy(true);
         return;   // 剩下的全部由 onAgentEvent 驱动
       }
 
       /* ---- 本地兜底 ---- */
-      statusEl.className = 'lab-note';
-      statusEl.textContent = 'Planning…';
-
+      if (busy) {
+        pushStatus('The local fallback planner cannot be steered mid-task.', true);
+        return;
+      }
+      pushUser(task);
       const planned = planLocally(task, world.snapshot() as any);
       if (!planned) {
-        statusEl.className = 'lab-note is-err';
-        statusEl.textContent = "I couldn't turn that into a plan. Try one of the examples.";
+        pushStatus("I couldn't turn that into a plan. Try one of the examples.", true);
         return;
       }
 
       setBusy(true);
-      env = planned;
-      drawPlan();
-      statusEl.textContent = 'Running…';
-
-      const res = await runLocally(env.rtdl, prims, { onUpdate: () => { drawPlan(); drawState(); } });
-
-      if (res.ok) {
-        env.task_update.status = 'succeeded';
-        statusEl.className = 'lab-note';
-        statusEl.textContent = 'Done.';
-        sfx.done();
-      } else {
-        env.task_update.status = 'failed';
-        statusEl.className = 'lab-note is-err';
-        statusEl.textContent = `Stopped: ${res.error}`;
-        sfx.reject();
-      }
-      drawPlan(); drawState();
+      const redraw = pushLocalPlan(planned);
+      const res = await runLocally(planned.rtdl, prims, {
+        onUpdate: () => { redraw(); drawState(); },
+      });
+      redraw(); drawState();
+      if (res.ok) { pushStatus('Done.'); sfx.done(); }
+      else { pushStatus(`Stopped: ${res.error}`, true); sfx.reject(); }
       setBusy(false);
     }
 
@@ -553,11 +741,260 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
 
     addEventListener('resize', () => world.resize());
     drawState();
-    drawPlan();
+    setBusy(false);
   }
 </script>
 
 <style>
+  /* ==========================================================================
+     顶栏
+     ========================================================================== */
+  .pg-top {
+    display: flex;
+    align-items: center;
+    gap: var(--sp-4);
+    padding-bottom: var(--sp-3);
+    margin-bottom: var(--sp-4);
+    border-bottom: 1px solid var(--border);
+  }
+  .pg-back {
+    flex: none;
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+    text-decoration: none;
+    white-space: nowrap;
+  }
+  .pg-back:hover { color: var(--link-hover); }
+  .pg-back-arrow { display: inline-block; transition: transform 0.15s ease; }
+  .pg-back:hover .pg-back-arrow { transform: translateX(-2px); }
+  @media (prefers-reduced-motion: reduce) {
+    .pg-back-arrow { transition: none; }
+  }
+
+  .pg-title {
+    flex: 1 1 auto;
+    margin: 0;
+    font-family: var(--font-sans);
+    font-size: var(--fs-h2);
+    font-weight: var(--fw-bold);
+    letter-spacing: var(--ls-tight);
+  }
+
+  .pg-links { flex: none; display: flex; align-items: center; gap: var(--sp-4); }
+  /* 字标跟着 currentColor 走，所以这里定颜色就够，不用两套图 */
+  .pg-mark { display: block; color: var(--text-muted); }
+  .pg-mark:hover { color: var(--link-hover); }
+  .pg-mark :global(svg) { display: block; height: 1.35rem; width: auto; }
+  .pg-gh { display: block; color: var(--text-faint); }
+  .pg-gh:hover { color: var(--link-hover); }
+  .pg-gh svg { display: block; }
+
+  /* ==========================================================================
+     工作区：左 3D，右时间线
+     ========================================================================== */
+  .pg-work {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: var(--sp-6);
+    align-items: start;
+  }
+  /* 左列钉住：右边这条流再长，机器人也一直在视野里。
+     整个 demo 的意义就在于同时看到这两件事。 */
+  .pg-stage-col { position: sticky; top: var(--sp-4); min-width: 0; }
+  .pg-feed-col { min-width: 0; }
+
+  .pg-ask { display: flex; gap: var(--sp-3); margin-top: var(--sp-4); }
+  .pg-ask input {
+    flex: 1 1 auto; min-width: 0;
+    font-family: var(--font-sans); font-size: var(--fs-base);
+    color: var(--text); background: var(--bg);
+    border: 1px solid var(--border-strong);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-3) var(--sp-4);
+  }
+  .pg-ask input:focus-visible { outline: 2px solid var(--link); outline-offset: 1px; }
+  .pg-ask button {
+    flex: none;
+    font-family: var(--font-sans); font-size: var(--fs-base);
+    font-weight: var(--fw-medium);
+    color: var(--bg); background: var(--text);
+    border: 1px solid var(--text);
+    border-radius: var(--radius-sm);
+    padding: var(--sp-3) var(--sp-5);
+    cursor: pointer;
+  }
+  .pg-ask button:hover { background: var(--link-hover); border-color: var(--link-hover); }
+  /* 机器人在干活时按钮变成 Steer —— 用颜色说明「这次是插话，不是新任务」 */
+  .pg-ask button.is-steer { background: var(--link); border-color: var(--link); }
+  .pg-hint {
+    margin: var(--sp-2) 0 0;
+    font-size: var(--fs-xs); line-height: var(--lh-base);
+    color: var(--text-faint);
+  }
+
+  .pg-world { margin-top: var(--sp-5); }
+  .pg-world > h2 {
+    display: flex; align-items: baseline; gap: var(--sp-3);
+    font-family: var(--font-sans); font-size: var(--fs-h3);
+    font-weight: var(--fw-semibold); letter-spacing: var(--ls-tight);
+    margin: 0 0 var(--sp-3);
+    padding-bottom: var(--sp-2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* ==========================================================================
+     时间线
+     ========================================================================== */
+  .pg-feed {
+    /* 自己滚，不把整页拉长 —— 否则 sticky 的左列就没意义了 */
+    max-height: calc(100vh - 9rem);
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+    padding-right: var(--sp-3);
+    display: flex;
+    flex-direction: column;
+    gap: var(--sp-4);
+  }
+  .pg-empty {
+    margin: 0; padding: var(--sp-5) 0;
+    font-size: var(--fs-sm); line-height: var(--lh-base);
+    color: var(--text-faint);
+  }
+
+  /* ---- 气泡 ----
+     注意全部写成 :global。这些元素是 JS 用 createElement / innerHTML 造的，
+     拿不到 Astro 的 scope 属性，作用域样式一条都不会命中 —— 表现就是
+     右边整栏纯文本、气泡和卡片全没有。终端浮层那次踩过一模一样的坑。 */
+  :global(.pg-msg) { display: flex; flex-direction: column; gap: var(--sp-2); }
+  :global(.pg-msg.is-user) { align-items: flex-end; }
+
+  :global(.pg-who) {
+    font-family: var(--font-mono); font-size: var(--fs-xs);
+    color: var(--text-faint); letter-spacing: 0.02em;
+  }
+  :global(.pg-bubble) {
+    max-width: 92%;
+    padding: var(--sp-3) var(--sp-4);
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    font-size: var(--fs-sm);
+    line-height: var(--lh-base);
+    color: var(--text);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+  }
+  :global(.pg-msg.is-user .pg-bubble) {
+    background: var(--bg-subtle);
+    border-color: var(--border-strong);
+  }
+  :global(.pg-msg.is-agent .pg-bubble) { background: var(--bg); }
+
+  /* 中途插话标一下，读记录时分得清哪句是改主意 */
+  :global(.pg-steer-tag) {
+    display: inline-block;
+    margin-left: var(--sp-2);
+    padding: 0 5px;
+    border: 1px solid var(--link);
+    border-radius: 3px;
+    font-size: 0.85em;
+    color: var(--link);
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+  }
+
+  /* 正在吐字时末尾一个闪动的方块 —— 让「它还在想」这件事看得见 */
+  :global(.pg-caret) {
+    display: inline-block;
+    width: 0.45em; height: 1em;
+    margin-left: 2px;
+    vertical-align: -0.13em;
+    background: var(--link);
+    animation: pg-blink 1s steps(2, start) infinite;
+  }
+  @keyframes pg-blink { 50% { opacity: 0; } }
+  @media (prefers-reduced-motion: reduce) {
+    :global(.pg-caret) { animation: none; }
+  }
+
+  /* ---- 状态行：不做成气泡，它不是「说的话」 ---- */
+  :global(.pg-status) {
+    font-family: var(--font-mono); font-size: var(--fs-xs);
+    line-height: var(--lh-base);
+    color: var(--text-faint);
+    overflow-wrap: anywhere;
+  }
+  :global(.pg-status.is-err) { color: #c0392b; }
+
+  /* 「正在想」那一行：三个点依次亮起。规划要等好几秒，
+     这段时间页面上必须有东西在动，否则看着像卡死。 */
+  :global(.pg-live) {
+    display: flex; align-items: center; gap: var(--sp-2);
+    color: var(--link);
+  }
+  :global(.pg-dots) { display: inline-flex; gap: 3px; flex: none; }
+  :global(.pg-dots i) {
+    width: 4px; height: 4px;
+    border-radius: 50%;
+    background: currentColor;
+    animation: pg-dot 1.2s ease-in-out infinite;
+  }
+  :global(.pg-dots i:nth-child(2)) { animation-delay: 0.15s; }
+  :global(.pg-dots i:nth-child(3)) { animation-delay: 0.3s; }
+  @keyframes pg-dot {
+    0%, 60%, 100% { opacity: 0.25; transform: translateY(0); }
+    30%           { opacity: 1;    transform: translateY(-2px); }
+  }
+
+  /* 树里正在执行的那一行也要动 —— 这样「机器人此刻在做哪一步」
+     不用对着 3D 猜。 */
+  :global(.rtdl .rt-row.is-running) { color: var(--link); }
+  :global(.rtdl .rt-row.is-running .rt-glyph) {
+    animation: pg-run 1s ease-in-out infinite;
+  }
+  :global(.rtdl .rt-row.is-running .rt-desc) { color: var(--link-hover); }
+  @keyframes pg-run {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.35; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    :global(.pg-dots i),
+    :global(.rtdl .rt-row.is-running .rt-glyph) { animation: none; }
+  }
+  :root[data-theme='dark'] :global(.pg-status.is-err) { color: #ff6b6b; }
+
+  /* ---- RTDL 卡片 ---- */
+  /* 时间线是 column flex 且有 max-height，子项默认 flex-shrink:1 会被压扁。
+     气泡有文字撑着还看得见，计划卡片是 overflow:hidden，直接被压成一条线 ——
+     只剩标题、树整个不见了。所以每一项都必须 flex:none。 */
+  :global(.pg-feed > *) { flex: none; }
+
+  :global(.pg-plan) {
+    border: 1px solid var(--border);
+    border-radius: var(--radius-md);
+    background: var(--bg-subtle);
+    overflow: hidden;
+  }
+  :global(.pg-plan-head) {
+    display: flex; align-items: baseline; gap: var(--sp-3);
+    padding: var(--sp-2) var(--sp-3);
+    border-bottom: 1px solid var(--border);
+    font-family: var(--font-mono); font-size: var(--fs-xs);
+    color: var(--text-muted);
+  }
+  :global(.pg-plan-tag) {
+    color: var(--link);
+    font-weight: var(--fw-medium);
+    letter-spacing: 0.06em;
+  }
+  :global(.pg-plan-count) { margin-left: auto; color: var(--text-faint); }
+  :global(.pg-plan-body) {
+    padding: var(--sp-3);
+    /* 树是等宽对齐的，宁可横向滚也不能折行 —— 折了连接线就废了 */
+    overflow-x: auto;
+    scrollbar-width: thin;
+  }
+
   .page-title {
     font-family: var(--font-sans);
     font-size: var(--fs-h1);
@@ -624,9 +1061,86 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
   }
   .lab-ex:hover { color: var(--link-hover); text-decoration: underline; }
 
+  /* ---- 思考中 ----
+     pilot 是流式吐字的。这段字之前被塞进一行状态里还截断到 160 字，
+     等于扔掉了 —— 而「模型现在在想什么」恰恰是计划树答不出来的那部分。
+     所以给它一块自己的地方，钉在计划栏底部，出新计划时收起。 */
+  .lab-think {
+    display: flex;
+    gap: var(--sp-2);
+    align-items: baseline;
+    margin-top: var(--sp-3);
+    padding-top: var(--sp-3);
+    border-top: 1px dashed var(--border);
+    font-size: var(--fs-xs);
+    line-height: var(--lh-base);
+    color: var(--text-muted);
+  }
+  .lab-think-dot {
+    flex: none;
+    width: 0.45em; height: 0.45em;
+    margin-top: 0.4em;
+    border-radius: 50%;
+    background: var(--link);
+    animation: lab-think-pulse 1.1s ease-in-out infinite;
+  }
+  @keyframes lab-think-pulse {
+    0%, 100% { opacity: 1; transform: scale(1); }
+    50%      { opacity: 0.3; transform: scale(0.7); }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lab-think-dot { animation: none; }
+  }
+
   .lab-note { margin: var(--sp-2) 0 0; font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); }
   .lab-note.is-err { color: #c0392b; }
   :root[data-theme='dark'] .lab-note.is-err { color: #ff6b6b; }
+
+  /* ---- 左右分栏 ----
+     3D 一列、计划一列，一眼能同时看到「树上哪一步在跑」和「屏幕里在动什么」。
+     左列 sticky：计划再长，机器人也一直在视野里。 */
+  .lab-split {
+    display: grid;
+    grid-template-columns: minmax(0, 1.05fr) minmax(0, 1fr);
+    gap: var(--sp-6);
+    align-items: start;
+  }
+  .lab-left {
+    position: sticky;
+    /* 站点没有固定顶栏，贴一点边距就够 */
+    top: var(--sp-4);
+  }
+  .lab-right { min-width: 0; }
+  .lab-world { margin-top: var(--sp-5); }
+
+  /* 计划栏内部滚动，免得整页被一棵长树拉得很高、
+     反而把 3D 挤出屏幕 —— sticky 只在页面滚动时有用。 */
+  .lab-plan .rtdl {
+    max-height: calc(100vh - 16rem);
+    min-height: 14rem;
+    overflow-y: auto;
+    overflow-x: auto;
+    /* 滚动条压在内容右侧，留一点呼吸 */
+    padding-right: var(--sp-2);
+    scrollbar-width: thin;
+  }
+
+  /* 屏幕不够宽就老实回到上下排布，sticky 也一并关掉：
+     窄屏上 sticky 会把输入框顶出可视区。 */
+  /* 屏幕不够宽就回到上下排布。sticky 也一并关掉 ——
+     窄屏上钉住左列会把输入框顶出可视区。 */
+  @media (max-width: 72rem) {
+    .pg-work { grid-template-columns: minmax(0, 1fr); }
+    .pg-stage-col { position: static; }
+    .pg-feed { max-height: 34rem; }
+  }
+  @media (max-width: 40rem) {
+    .pg-top { flex-wrap: wrap; gap: var(--sp-2) var(--sp-3); }
+    .pg-title { order: 3; flex-basis: 100%; font-size: var(--fs-h3); }
+    .pg-links { margin-left: auto; }
+    .pg-ask { flex-wrap: wrap; }
+    .pg-ask button { width: 100%; }
+  }
 
   /* ---- 两块面板 ---- */
   .lab-panels {
@@ -743,51 +1257,61 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
   }
 
   /* ---- RTDL 树 ---- */
-  .rtdl { font-size: var(--fs-xs); }
-  .rtdl :global(.rt-say) {
+  /* .rtdl 这个类现在也是 JS 加上去的（pg-plan-body rtdl），
+     所以连它自己带上整条后代选择器都必须是 global。 */
+  /* 等宽必须在 .rtdl 本身上。
+     连接线（├─ │ └─）是靠字符宽度对齐的，一旦掉回比例字体整棵树就散了。
+     以前 mono 只挂在 .rt-tree-body 上，而计划卡片是直接塞 renderNode()
+     的输出、没有那层包裹，于是树就是歪的。 */
+  :global(.rtdl) {
+    font-family: var(--font-mono);
+    font-size: var(--fs-xs);
+    line-height: 1.75;
+  }
+  :global(.rtdl .rt-say) {
     margin: 0 0 var(--sp-3);
     font-family: var(--font-sans); font-size: var(--fs-base);
     color: var(--text); line-height: var(--lh-snug);
   }
-  .rtdl :global(.rt-head) {
+  :global(.rtdl .rt-head) {
     display: flex; justify-content: space-between; align-items: baseline;
     gap: var(--sp-3); margin-bottom: var(--sp-2);
     font-size: var(--fs-sm); color: var(--text-muted);
   }
-  .rtdl :global(.rt-progress) { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); }
+  :global(.rtdl .rt-progress) { font-family: var(--font-mono); font-size: var(--fs-xs); color: var(--text-faint); }
 
-  .rtdl :global(.rt-tree-body) {
+  :global(.rtdl .rt-tree-body) {
     font-family: var(--font-mono);
     line-height: 1.75;
     overflow-x: auto;
   }
-  .rtdl :global(.rt-row) { white-space: nowrap; }
-  .rtdl :global(.rt-tree)  { color: var(--border-strong); }
-  .rtdl :global(.rt-glyph) { display: inline-block; width: 1.4em; }
-  .rtdl :global(.rt-desc)  { color: var(--text); }
-  .rtdl :global(.rt-op)    { font-size: 0.9em; color: var(--text-faint); }
-  .rtdl :global(.rt-par)::before { content: '∥ '; }
-  .rtdl :global(.rt-cap)   { color: var(--link); }
-  .rtdl :global(.rt-args)  { color: var(--text-muted); }
-  .rtdl :global(.rt-ms)    { color: var(--text-faint); margin-left: var(--sp-2); }
-  .rtdl :global(.rt-error) { color: #c0392b; white-space: pre-wrap; }
-  :root[data-theme='dark'] .rtdl :global(.rt-error) { color: #ff6b6b; }
+  :global(.rtdl .rt-row) { white-space: nowrap; }
+  :global(.rtdl .rt-tree)  { color: var(--border-strong); }
+  :global(.rtdl .rt-glyph) { display: inline-block; width: 1.4em; }
+  :global(.rtdl .rt-desc)  { color: var(--text); }
+  :global(.rtdl .rt-op)    { font-size: 0.9em; color: var(--text-faint); }
+  :global(.rtdl .rt-par)::before { content: '∥ '; }
+  :global(.rtdl .rt-cap)   { color: var(--link); }
+  :global(.rtdl .rt-args)  { color: var(--text-muted); }
+  :global(.rtdl .rt-ms)    { color: var(--text-faint); margin-left: var(--sp-2); }
+  :global(.rtdl .rt-error) { color: #c0392b; white-space: pre-wrap; }
+  :root[data-theme='dark'] :global(.rtdl .rt-error) { color: #ff6b6b; }
 
-  .rtdl :global(.is-pending)   { opacity: 0.45; }
-  .rtdl :global(.is-running)   { color: var(--link); font-weight: var(--fw-medium); }
-  .rtdl :global(.is-running .rt-desc) { color: var(--link-hover); }
-  .rtdl :global(.is-skipped)   { opacity: 0.25; }
-  .rtdl :global(.is-failed .rt-glyph),
-  .rtdl :global(.is-failed .rt-desc) { color: #c0392b; }
-  :root[data-theme='dark'] .rtdl :global(.is-failed .rt-glyph),
-  :root[data-theme='dark'] .rtdl :global(.is-failed .rt-desc) { color: #ff6b6b; }
+  :global(.rtdl .is-pending)   { opacity: 0.45; }
+  :global(.rtdl .is-running)   { color: var(--link); font-weight: var(--fw-medium); }
+  :global(.rtdl .is-running .rt-desc) { color: var(--link-hover); }
+  :global(.rtdl .is-skipped)   { opacity: 0.25; }
+  :global(.rtdl .is-failed .rt-glyph),
+  :global(.rtdl .is-failed .rt-desc) { color: #c0392b; }
+  :root[data-theme='dark'] :global(.rtdl .is-failed .rt-glyph),
+  :root[data-theme='dark'] :global(.rtdl .is-failed .rt-desc) { color: #ff6b6b; }
 
-  .rtdl :global(.rt-goal) {
+  :global(.rtdl .rt-goal) {
     margin: var(--sp-4) 0 0; padding-top: var(--sp-2);
     border-top: 1px solid var(--border);
     font-size: var(--fs-sm); color: var(--text-muted);
   }
-  .rtdl :global(.rt-goal span) {
+  :global(.rtdl .rt-goal span) {
     font-family: var(--font-mono); font-size: var(--fs-xs);
     color: var(--text-faint); margin-right: var(--sp-2);
   }
@@ -865,6 +1389,6 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
     .lab-stage canvas { aspect-ratio: 1 / 1; }
     .bubble { max-width: 84%; font-size: var(--fs-xs); }
     /* 手机上树很容易横向溢出，缩一号并允许自己滚 */
-    .rtdl :global(.rt-tree-body) { font-size: 0.72rem; }
+    :global(.rtdl .rt-tree-body) { font-size: 0.72rem; }
   }
 </style>

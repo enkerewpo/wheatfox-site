@@ -25,6 +25,16 @@ interface Props {
   publishedAt?: Date;
   /** 覆盖默认 OG 图 */
   ogImage?: string;
+  /**
+   * 用更宽的版心。正文页保持 76rem —— 那是按可读行长定的，不该动；
+   * 但 playground 要左右并排放 3D 和计划树，76rem 挤不下。
+   */
+  wide?: boolean;
+  /**
+   * 去掉侧栏，内容占满屏幕。给 playground 这类「一整块工作区」用 ——
+   * 那里侧栏只是在抢地方，页面自己会放一个返回链接。
+   */
+  bare?: boolean;
 }
 
 const {
@@ -33,6 +43,8 @@ const {
   ogType = 'website',
   publishedAt,
   ogImage = images.ogImage,
+  wide = false,
+  bare = false,
 } = Astro.props;
 
 const pageTitle = title ? `${title} — ${site.title}` : site.title;
@@ -117,14 +129,14 @@ const ogImageUrl = new URL(ogImage, base).href;
     <div class="layout">
       <a class="skip-link" href="#main">Skip to content</a>
 
-      <div class="shell">
-        <Sidebar />
+      <div class:list={["shell", { "is-wide": wide, "is-bare": bare }]}>
+        {!bare && <Sidebar />}
         <main id="main">
           <slot />
         </main>
       </div>
 
-      <div class="page-footer">
+      <div class:list={["page-footer", { "is-wide": wide, "is-bare": bare }]}>
         <Footer />
       </div>
     </div>

@@ -96,6 +96,21 @@ hr {
 /* 主内容列：minmax(0,1fr) above 保证长代码块不会把网格撑爆 */
 .shell > main { min-width: 0; }
 
+/* 宽版心。只有明确要求的页面才用（Base 的 wide 属性）。 */
+.shell.is-wide,
+.page-footer.is-wide { max-width: var(--w-shell-wide); }
+
+/* 无侧栏、占满屏。给 playground 那种整块工作区用：
+   侧栏在那里只是抢地方，页面自己在左上角放返回链接。 */
+.shell.is-bare,
+.page-footer.is-bare {
+  max-width: none;
+  grid-template-columns: minmax(0, 1fr);
+  padding-left: var(--sp-5);
+  padding-right: var(--sp-5);
+}
+.shell.is-bare { padding-top: var(--sp-4); }
+
 .page-footer {
   width: 100%;
   max-width: var(--w-shell);

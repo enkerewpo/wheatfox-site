@@ -61,16 +61,59 @@ function esc(s: string): string {
     ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' })[c]!);
 }
 
+/**
+ * 参数摘要。
+ *
+ * 契约用的是 ROS 消息，线上长这样：
+ *   goal={"header":{"frame_id":"room","stamp":{"sec":0,"nanosec":0}},"pose":{...}}
+ * 整条铺出来占满一行却几乎没有信息量 —— 真正要看的是「去哪、抓什么、
+ * 哪个关节动到多少」。所以这里把常见的几种消息压成人能读的形式。
+ *
+ * 只动显示，不动内容：压不出名堂的照原样截断输出，绝不悄悄丢掉一个参数。
+ */
 function fmtArgs(args: Record<string, unknown>): string {
-  const entries = Object.entries(args ?? {});
-  if (!entries.length) return '';
-  return entries
-    .map(([k, v]) => {
-      let s = typeof v === 'string' ? v : JSON.stringify(v);
-      // 图片这类长参数不能整个铺出来
-      if (s.length > 42) s = s.slice(0, 39) + '…';
-      return `${k}=${s}`;
-    })
+  const num = (v: unknown) => (typeof v === 'number' ? (Math.round(v * 100) / 100).toString() : String(v));
+
+  const one = (k: string, v: any): string | null => {
+    // ROS 的 header / stamp 是协议噪音，树上没人看
+    if (k === 'header' || k === 'stamp') return null;
+    // 空数组的 velocity / effort 同理
+    if ((k === 'velocity' || k === 'effort') && Array.isArray(v) && v.every((x) => !x)) return null;
+
+    // PoseStamped / Pose —— 只报位置，必要时报朝向
+    const pose = v?.pose ?? (v?.position ? v : null);
+    if (pose?.position) {
+      const p = pose.position;
+      const q = pose.orientation;
+      const yaw = q && (q.w || q.z)
+        ? `, yaw ${num((Math.atan2(2 * (q.w * q.z), 1 - 2 * q.z * q.z) * 180) / Math.PI)}°`
+        : '';
+      return `${k}=(${num(p.x)}, ${num(p.y)}${p.z ? `, ${num(p.z)}` : ''})${yaw}`;
+    }
+
+    // JointState —— 名字和位置配对，比两个平行数组好读得多
+    if (Array.isArray(v) && k === 'name' && Array.isArray((args as any).position)) {
+      const pos = (args as any).position as unknown[];
+      return v.map((n, i) => `${n}=${num(pos[i])}`).join(' ');
+    }
+    if (k === 'position' && Array.isArray((args as any).name)) return null;   // 上面一并处理了
+
+    // MoveCommand —— 只报非零的那几项
+    if (k === 'command' && v && typeof v === 'object') {
+      const parts = Object.entries(v)
+        .filter(([, x]) => typeof x === 'number' && x !== 0)
+        .map(([kk, x]) => `${kk}=${num(x)}`);
+      return parts.length ? parts.join(' ') : `${k}=(no motion)`;
+    }
+
+    let str = typeof v === 'string' ? v : JSON.stringify(v);
+    if (str && str.length > 44) str = str.slice(0, 41) + '…';
+    return `${k}=${str}`;
+  };
+
+  return Object.entries(args ?? {})
+    .map(([k, v]) => one(k, v))
+    .filter((x): x is string => !!x)
     .join(' ');
 }
 

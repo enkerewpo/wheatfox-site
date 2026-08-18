@@ -142,6 +142,9 @@
 
   /* 两栏：左边身份栏常驻，右边内容铺开 */
   --w-shell:   76rem;
+  /* 少数页面需要更宽的画布 —— playground 要把 3D 和计划树并排放下。
+     Base 的 wide 开关切到这个值，其余一切照旧。 */
+  --w-shell-wide: 94rem;
   --w-sidebar: 17rem;
   --w-gutter:  3.5rem;
 
