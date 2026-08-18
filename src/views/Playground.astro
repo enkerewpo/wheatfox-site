@@ -1359,53 +1359,79 @@ import { url } from '@/lib/url';
   }
 
   /* ---- 窄屏 ---- */
-  /* ---- 运行来源 ---- */
+  /* ---- 运行来源 ----
+     整段写成 :global。这张表的行是 JS 用 innerHTML 造的，拿不到 Astro 的
+     scope 属性，`.prov dd { ... }` 会被编译成 `.prov dd[data-astro-…]`，
+     一条都匹配不上 —— 表现就是字体和分隔线全没了。
+     和气泡、计划卡片是同一个坑。 */
   .prov {
     margin: 0;
-    max-width: var(--w-prose);
+    max-width: none;
     font-size: var(--fs-sm);
   }
-  .prov > div {
+  /* 内容全是版本号、内核串、契约 id —— 本来就该等宽，列才对得齐 */
+  :global(.prov) { font-family: var(--font-mono); }
+  :global(.prov > div) {
     display: grid;
-    grid-template-columns: 7.5rem 1fr;
-    gap: var(--sp-3);
+    grid-template-columns: 8rem minmax(0, 1fr);
+    gap: var(--sp-4);
     padding: var(--sp-2) 0;
     border-bottom: 1px solid var(--border);
+    align-items: baseline;
   }
-  .prov > div:last-child { border-bottom: 0; }
-  .prov dt { color: var(--text-muted); }
-  .prov dd { margin: 0; font-family: var(--font-mono); color: var(--text); overflow-wrap: anywhere; }
-  /* dd 里可以有多段：模型名一行，来源和端点各自换行 */
-  .prov dd > span { display: block; }
-  .prov-dim { color: var(--text-faint); }
+  :global(.prov > div:last-child) { border-bottom: 0; }
+  /* 标签用无衬线，和值区分开：一列是名字，一列是数据 */
+  :global(.prov dt) {
+    font-family: var(--font-sans);
+    font-size: var(--fs-xs);
+    letter-spacing: 0.02em;
+    color: var(--text-faint);
+    text-transform: uppercase;
+  }
+  :global(.prov dd) {
+    margin: 0;
+    color: var(--text);
+    overflow-wrap: anywhere;
+    line-height: var(--lh-base);
+  }
+  /* dd 里可以有多段：模型名一行，端点另起一行 */
+  :global(.prov dd > span) { display: block; }
+  :global(.prov-dim) { color: var(--text-faint); }
   /* 「用的是哪个模型」是这一节最该一眼看到的 */
-  .prov-model {
+  :global(.prov-model) {
     font-weight: 600;
     color: var(--link-hover);
   }
-  .prov-providers {
+  :global(.prov-providers) {
     list-style: none;
     margin: var(--sp-2) 0 0;
     padding: 0;
   }
-  .prov-providers li {
-    display: flex;
-    flex-wrap: wrap;
+  :global(.prov-providers li) {
+    display: grid;
+    grid-template-columns: 9rem 5.5rem minmax(0, 1fr);
+    gap: var(--sp-2) var(--sp-3);
     align-items: baseline;
-    gap: var(--sp-2);
-    padding: 2px 0;
+    padding: 3px 0;
   }
-  .prov-providers code { font-size: 1em; }
-  .prov-layer {
-    font-size: 0.82em;
-    letter-spacing: 0.04em;
+  :global(.prov-providers code) { font-size: 1em; color: var(--link); }
+  :global(.prov-layer) {
+    justify-self: start;
+    font-size: 0.78em;
+    letter-spacing: 0.05em;
     text-transform: uppercase;
     color: var(--text-faint);
     border: 1px solid var(--border);
     border-radius: 3px;
-    padding: 0 4px;
+    padding: 0 5px;
   }
-  .prov-providers .prov-dim { flex-basis: 100%; }
+
+  /* 窄屏放弃分栏，改成上下 */
+  @media (max-width: 46rem) {
+    :global(.prov > div) { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+    :global(.prov-providers li) { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+  }
+
   .prov-role {
     margin-top: var(--sp-4);
     font-size: var(--fs-sm);
@@ -1423,7 +1449,7 @@ import { url } from '@/lib/url';
     .lab-panels { grid-template-columns: minmax(0, 1fr); gap: var(--sp-5); }
   }
   @media (max-width: 34rem) {
-    .prov > div { grid-template-columns: 1fr; gap: 2px; }
+    :global(.prov > div) { grid-template-columns: minmax(0, 1fr); gap: 2px; }
   }
   @media (max-width: 34rem) {
     .lab-ask { flex-wrap: wrap; }
