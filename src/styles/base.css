@@ -28,6 +28,26 @@ body {
 
 ::selection { background: var(--bg-selection); }
 
+/*
+  等宽元素的全局兜底。
+  之前只在 .prose code 里设了字体，于是正文之外的 <code>（首页 News 里的
+  /proc/version、playground 说明里的契约名）全部退回浏览器默认等宽字体 ——
+  而各平台的默认等宽字体完全不同，看起来就是「手机上字体不对」。
+*/
+code, kbd, samp, pre {
+  font-family: var(--font-mono);
+  font-size: 0.9em;
+}
+
+/* 行内 code 的底色，正文之外也要有 */
+:not(pre) > code {
+  background: var(--bg-code);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 0.08em 0.32em;
+  word-break: break-word;
+}
+
 img, svg, video { max-width: 100%; height: auto; display: block; }
 
 a {

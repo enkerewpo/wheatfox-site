@@ -82,9 +82,17 @@
   /* 手写体，只用在 wordmark */
   --font-display: 'Patrick Hand', cursive;
 
-  /* 正文和界面，全站主力 */
-  --font-sans: 'Fira Sans', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei',
-    -apple-system, BlinkMacSystemFont, sans-serif;
+  /*
+    正文和界面，全站主力。
+
+    顺序有讲究：字体回退是**逐字形**的，而 PingFang / 微软雅黑 里是带拉丁字形的
+    （长得像 Helvetica）。所以 CJK 字体必须排在系统字体**后面** ——
+    否则一旦 Fira Sans 没加载成功（比如 iOS 锁定模式会直接禁用网页字体），
+    拉丁文会掉进 PingFang 而不是系统 UI 字体，整页观感就变了。
+    放到最后，它们就只负责兜 CJK 字形，各司其职。
+  */
+  --font-sans: 'Fira Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
+    'PingFang SC', 'Noto Sans SC', 'Microsoft YaHei', sans-serif;
 
   /* 代码 */
   --font-mono: 'Source Code Pro Variable', 'Source Code Pro', 'SF Mono',

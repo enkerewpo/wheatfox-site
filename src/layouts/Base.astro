@@ -6,8 +6,12 @@ import Footer from '@/components/Footer.astro';
 import Terminal from '@/components/Terminal.astro';
 import LifeFavicon from '@/components/LifeFavicon.astro';
 
-// 自托管字体，不走任何第三方 CDN
-
+// 自托管字体，不走任何第三方 CDN。
+// 必须在 tokens.css 之前 —— 那里的 --font-* 变量引用的就是这些 family 名。
+// （这一行曾经漏掉过：@font-face 一条都没进构建产物，字体文件照样被下面的
+//  preload 下载了，所以网络面板里全是 200，看着一切正常，实际每个平台都在
+//  用系统字体。preload 只负责下载，不声明任何东西。）
+import '../styles/fonts.css';
 import '../styles/tokens.css';
 import '../styles/base.css';
 import '../styles/prose.css';

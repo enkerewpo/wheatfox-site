@@ -127,6 +127,14 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
     </div>
     <dl class="prov">
       <div>
+        <dt>Model</dt>
+        <dd>
+          <strong class="prov-model">{P.vlm.model}</strong>
+          <span class="prov-dim">{P.vlm.vendor} · {P.vlm.modalities}</span>
+          <span class="prov-dim">{P.vlm.endpoint}</span>
+        </dd>
+      </div>
+      <div>
         <dt>Robonix</dt>
         <dd>
           <a href={P.robonix.repo}>{P.robonix.version}</a>
@@ -151,9 +159,21 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
       </div>
       <div>
         <dt>Browser</dt>
-        <dd>{P.browserRole}</dd>
+        <dd>
+          {P.browserRole}
+          <ul class="prov-providers">
+            {P.browserProviders.map((p) => (
+              <li>
+                <code>{p.id}</code>
+                <span class="prov-layer">{p.layer}</span>
+                <span class="prov-dim">{p.caps} caps · {p.note}</span>
+              </li>
+            ))}
+          </ul>
+        </dd>
       </div>
     </dl>
+    <p class="prose prov-role">{P.vlm.role}</p>
     <p class="prov-note" id="prov-note"></p>
   </section>
 </Base>
@@ -162,9 +182,17 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
   import { LabWorld } from '@/lib/lab/world';
   import { makePrimitives, CATALOG } from '@/lib/lab/primitives';
   import { planLocally, runLocally } from '@/lib/lab/local-fallback';
-  import { renderEnvelope, type RtdlEnvelope } from '@/lib/lab/rtdl';
+  import {
+    renderEnvelope, renderNode, fromWirePlan, applyNodeState,
+    countLeaves, type RtdlEnvelope, type RtdlNode,
+  } from '@/lib/lab/rtdl';
   import { OBJECTS, PLACES } from '@/lib/lab/scene-spec';
   import { sfx, setSfxEnabled, sfxEnabled, unlockAudioOnce } from '@/lib/lab/sfx';
+  import { RobonixLink, defaultLinkBase } from '@/lib/lab/robonix-link';
+  import { AgentClient, type AgentEvent } from '@/lib/lab/agent-client';
+  // 模型名只有一处真相：provenance。页面上写死过一次，换模型时就对不上了。
+  import { PROVENANCE } from '@/lib/lab/provenance';
+  const VLM_MODEL = PROVENANCE.vlm.model;
 
   const EXAMPLES = [
     'Cook me dinner',
@@ -227,19 +255,67 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
     let busy = false;
     let env: RtdlEnvelope | null = null;
 
-    /*
-      如实标注当前模式。连不上真运行时就说连不上 ——
-      演示里最不该做的事就是让人以为跑的是真的。
-    */
-    modeEl.textContent = 'local fallback';
-    modeEl.title = 'The Robonix runtime is not reachable from this page yet; planning and execution are running in the browser.';
+    /* ==================================================================
+       接上真的 Robonix
+       ==================================================================
+
+       三条 WebSocket 让服务器上的三个 provider 把这个网页当成机器人的身体，
+       第四条把用户输入的一句话交给 pilot。四条都通了才算「live」——
+       任何一条断了就如实降级到浏览器本地的规则规划，并且**在界面上说清楚**。
+       演示里最不该做的事就是让人以为跑的是真的。 */
+
     const provNote = document.getElementById('prov-note');
-    if (provNote) {
-      provNote.textContent =
-        'The runtime is installed and built on that host. This page is not yet wired to it — '
-        + 'planning and execution currently run in the browser as a fallback, which is why the '
-        + 'plan panel is labelled “local fallback”.';
+
+    const link = new RobonixLink(world, { base: defaultLinkBase() }, {
+      onState: () => refreshMode(),
+      // 服务器每调一次能力就在 HUD 上闪一下，让「这是远程驱动的」看得见
+      onCall: (op) => { hudText.textContent = op; hud.hidden = false; },
+      onResult: () => { hud.hidden = true; },
+    });
+
+    let agentState: 'connecting' | 'online' | 'offline' = 'connecting';
+    const agent = new AgentClient(
+      `${defaultLinkBase()}/agent`,
+      onAgentEvent,
+      (s) => { agentState = s; refreshMode(); },
+    );
+
+    /** 现在到底是 live 还是 fallback —— 这个判断只有一处 */
+    function isLive() { return link.online && agentState === 'online'; }
+
+    function refreshMode() {
+      if (isLive()) {
+        modeEl.textContent = `live · ${VLM_MODEL}`;
+        modeEl.classList.add('is-live');
+        modeEl.title =
+          'Connected to the Robonix runtime on dedsec-amd0. This page is registered with '
+          + `Atlas as three capability providers; the plan below comes from ${VLM_MODEL} `
+          + 'through pilot, and every motion is an executor dispatch.';
+        if (provNote) {
+          provNote.textContent =
+            'This page is currently attached to that runtime. The browser registers with Atlas '
+            + 'as browser_sim (primitive), browser_nav (service) and browser_scene (system), so '
+            + 'the robot you see is a real capability provider rather than a viewer.';
+        }
+      } else {
+        const why = !link.online
+          ? 'the robot body could not attach to the runtime'
+          : 'the planner is unreachable';
+        modeEl.textContent = 'local fallback';
+        modeEl.classList.remove('is-live');
+        modeEl.title = `Not connected — ${why}. Planning and execution are running in the browser.`;
+        if (provNote) {
+          provNote.textContent =
+            `The runtime lives on that host, but this page is not attached right now (${why}). `
+            + 'Planning and execution have fallen back to a rule-based planner running in the '
+            + 'browser, which is why the plan panel is labelled “local fallback”. '
+            + 'It reconnects on its own.';
+        }
+      }
     }
+    refreshMode();
+    link.start();
+    agent.connect();
 
     /* --------------------------------------------------------- 语音
        用浏览器自带的 TTS，参数保持中性，优先保证**各平台都能出声**。
@@ -306,10 +382,136 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
       stateEl.textContent = rows.join('\n');
     }
 
+    /* ================================================== 服务器推来的计划 */
+
+    /*
+      pilot 每一轮都发一棵新树（它会边做边改计划），所以这里保留最近几轮，
+      让人看得到它是怎么改主意的 —— 那恰恰是这套系统最值得看的部分。
+    */
+    type Round = { round: number; say: string; tree: RtdlNode | null };
+    let rounds: Round[] = [];
+    let liveGoal = '';
+
+    function drawLivePlan() {
+      if (!rounds.length) {
+        rtdlEl.innerHTML = '<p class="lab-empty">Ask for something.</p>';
+        return;
+      }
+      const html = rounds.map((r) => {
+        const total = r.tree ? countLeaves(r.tree) : 0;
+        return (
+          (r.say ? `<p class="rt-say">${escapeHtml(r.say)}</p>` : '') +
+          `<div class="rt-head">` +
+            `<span class="rt-summary">round ${r.round}</span>` +
+            `<span class="rt-progress">${total} call${total === 1 ? '' : 's'}</span>` +
+          `</div>` +
+          (r.tree ? `<div class="rt-tree-body">${renderNode(r.tree)}</div>` : '')
+        );
+      }).join('');
+      rtdlEl.innerHTML = html +
+        (liveGoal ? `<p class="rt-goal"><span>goal</span> ${escapeHtml(liveGoal)}</p>` : '');
+      rtdlEl.scrollTop = rtdlEl.scrollHeight;
+    }
+
+    function escapeHtml(s: string) {
+      return String(s).replace(/[&<>"]/g, (c) =>
+        ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]!));
+    }
+
+    let pendingText = '';
+
+    function onAgentEvent(e: AgentEvent) {
+      switch (e.kind) {
+        case 'ready':
+          break;
+
+        case 'status':
+          statusEl.className = 'lab-note';
+          statusEl.textContent = e.message;
+          break;
+
+        case 'text':
+          // pilot 是流式吐字的，攒到下一棵树出现时一并作为那一轮的开场白
+          pendingText += e.text;
+          statusEl.className = 'lab-note';
+          statusEl.textContent = pendingText.slice(-160);
+          break;
+
+        case 'plan': {
+          rounds.push({ round: e.round, say: pendingText.trim(), tree: fromWirePlan(e as any) });
+          pendingText = '';
+          if (rounds.length > 6) rounds = rounds.slice(-6);
+          drawLivePlan();
+          break;
+        }
+
+        case 'node': {
+          for (const r of rounds) {
+            if (r.tree && applyNodeState(r.tree, e)) break;
+          }
+          drawLivePlan();
+          drawState();
+          break;
+        }
+
+        case 'task':
+          liveGoal = e.goal;
+          drawLivePlan();
+          break;
+
+        case 'final':
+          if (e.text) {
+            statusEl.className = 'lab-note';
+            statusEl.textContent = e.text;
+            bubble.textContent = e.text;
+            bubble.hidden = false;
+            speak(e.text);
+          }
+          sfx.done();
+          break;
+
+        case 'error':
+          statusEl.className = 'lab-note is-err';
+          statusEl.textContent = e.message;
+          sfx.reject();
+          break;
+
+        case 'idle':
+          setBusy(false);
+          break;
+      }
+    }
+
+    function setBusy(b: boolean) {
+      busy = b;
+      goBtn.disabled = b;
+      input.disabled = b;
+      if (!b) input.focus();
+    }
+
     /* --------------------------------------------------------- 执行 */
     async function submit(task: string) {
       if (busy || !task.trim()) return;
 
+      /* ---- 真运行时 ---- */
+      if (isLive()) {
+        rounds = [];
+        pendingText = '';
+        liveGoal = task;
+        drawLivePlan();
+        statusEl.className = 'lab-note';
+        statusEl.textContent = 'Sending to pilot…';
+        setBusy(true);
+        if (!agent.submit(task)) {
+          statusEl.className = 'lab-note is-err';
+          statusEl.textContent = 'Lost the connection to the planner. Falling back locally.';
+          setBusy(false);
+          refreshMode();
+        }
+        return;   // 剩下的全部由 onAgentEvent 驱动
+      }
+
+      /* ---- 本地兜底 ---- */
       statusEl.className = 'lab-note';
       statusEl.textContent = 'Planning…';
 
@@ -320,9 +522,7 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
         return;
       }
 
-      busy = true;
-      goBtn.disabled = true;
-      input.disabled = true;
+      setBusy(true);
       env = planned;
       drawPlan();
       statusEl.textContent = 'Running…';
@@ -341,10 +541,7 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
         sfx.reject();
       }
       drawPlan(); drawState();
-      busy = false;
-      goBtn.disabled = false;
-      input.disabled = false;
-      input.focus();
+      setBusy(false);
     }
 
     form.addEventListener('submit', (e) => { e.preventDefault(); submit(input.value); });
@@ -450,6 +647,29 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
   .lab-mode {
     font-family: var(--font-mono); font-size: var(--fs-xs);
     font-weight: var(--fw-normal); color: var(--text-faint);
+    cursor: help;
+  }
+  /* 接上真运行时的时候，这个标记要看得见 —— 它是整个页面最重要的一句话。
+     用颜色 + 一个脉冲点，而不是只换文字，免得没人注意到 */
+  .lab-mode.is-live {
+    color: var(--link-hover);
+    font-weight: var(--fw-medium);
+  }
+  .lab-mode.is-live::before {
+    content: '';
+    display: inline-block;
+    width: 0.5em; height: 0.5em;
+    margin-right: 0.45em;
+    border-radius: 50%;
+    background: currentColor;
+    animation: lab-live-pulse 2s ease-in-out infinite;
+  }
+  @keyframes lab-live-pulse {
+    0%, 100% { opacity: 1; }
+    50%      { opacity: 0.25; }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .lab-mode.is-live::before { animation: none; }
   }
   .lab-empty { color: var(--text-faint); font-size: var(--fs-sm); margin: 0; }
 
@@ -589,7 +809,42 @@ import { PROVENANCE as P } from '@/lib/lab/provenance';
   .prov > div:last-child { border-bottom: 0; }
   .prov dt { color: var(--text-muted); }
   .prov dd { margin: 0; font-family: var(--font-mono); color: var(--text); overflow-wrap: anywhere; }
+  /* dd 里可以有多段：模型名一行，来源和端点各自换行 */
+  .prov dd > span { display: block; }
   .prov-dim { color: var(--text-faint); }
+  /* 「用的是哪个模型」是这一节最该一眼看到的 */
+  .prov-model {
+    font-weight: 600;
+    color: var(--link-hover);
+  }
+  .prov-providers {
+    list-style: none;
+    margin: var(--sp-2) 0 0;
+    padding: 0;
+  }
+  .prov-providers li {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: var(--sp-2);
+    padding: 2px 0;
+  }
+  .prov-providers code { font-size: 1em; }
+  .prov-layer {
+    font-size: 0.82em;
+    letter-spacing: 0.04em;
+    text-transform: uppercase;
+    color: var(--text-faint);
+    border: 1px solid var(--border);
+    border-radius: 3px;
+    padding: 0 4px;
+  }
+  .prov-providers .prov-dim { flex-basis: 100%; }
+  .prov-role {
+    margin-top: var(--sp-4);
+    font-size: var(--fs-sm);
+    color: var(--text-muted);
+  }
   .prov-note {
     max-width: var(--w-prose);
     margin: var(--sp-4) 0 0;

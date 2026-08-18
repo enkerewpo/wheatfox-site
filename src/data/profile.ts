@@ -32,11 +32,14 @@ export const profile = {
        researcher at the <a href="https://github.com/syswonder">Syswonder</a> community.`,
 
       `I lead <a href="https://github.com/syswonder/robonix">Robonix</a>, an embodied AI
-       operating system: it exposes heterogeneous robot hardware as typed, discoverable
-       capabilities, and treats pre-trained models as services — a VLM plans, VLA policies
-       act — so the system's job is composing, scheduling, and switching between them. I
-       also maintain <a href="https://github.com/syswonder/hvisor">hvisor</a>, a lightweight
-       type-1 hypervisor for edge devices.`,
+       operating system. It exposes heterogeneous robot hardware as typed, discoverable
+       capabilities, layered the way an OS layers anything else: primitives are the hardware,
+       services are the shared system facilities — navigation, mapping, semantic memory,
+       speech — and skills are the task-level behaviours, which is where a VLA policy lives.
+       A VLM sits above all of it and plans. The system's job is composing, scheduling and
+       switching between them. I also maintain
+       <a href="https://github.com/syswonder/hvisor">hvisor</a>, a lightweight type-1
+       hypervisor for edge devices.`,
 
       `I work upstream too — LoongArch virtualization and documentation tooling in the
        <a href="https://git.kernel.org/pub/scm/linux/kernel/git/torvalds/linux.git/">Linux
@@ -249,8 +252,8 @@ export const projects: Project[] = [
     href: 'https://github.com/syswonder/robonix',
     role: 'Lead',
     period: '2025 — Present',
-    description: 'An embodied AI operating system. Exposes heterogeneous robot hardware as typed, discoverable capabilities and treats pre-trained models as services — a VLM plans, VLA policies act — leaving the system to compose, schedule, and switch between them.',
-    tags: ['Embodied AI', 'Robotics', 'Python', 'ROS 2'],
+    description: 'An embodied AI operating system. Exposes heterogeneous robot hardware as typed, discoverable capabilities, layered into primitives (hardware), services (navigation, mapping, semantic memory, speech) and skills (task-level behaviours, including VLA policies), with a VLM planning above them. The system composes, schedules and switches between them.',
+    tags: ['Embodied AI', 'Robotics', 'Rust', 'Python', 'gRPC', 'MCP'],
   },
   {
     name: 'hvisor',

@@ -16,8 +16,17 @@ import {
   C, ROOM, FURNITURE, PLACES, OBJECTS, restingPosition, surfaceY,
   type PlaceId, type ObjectId,
 } from './scene-spec';
-import { buildGrid, planPath, resolveStand, type Grid } from './nav';
+import { buildGrid, planPath, resolveStand, isFree, type Grid } from './nav';
 import { sfx } from './sfx';
+import {
+  solveArm, isArmSolution, armForward, poseFromSim, poseToSim, wrapAngle,
+  ARM_MIN, ARM_MAX, GRIPPER_OPEN, GRIPPER_CLOSED, JOINT_NAMES,
+  type Pose, type Pose2,
+} from './pose';
+import type { WorldView } from './semantic-map';
+
+/** 手臂收起来时的长度 */
+const ARM_REST = 0.42;
 
 export type { PlaceId, ObjectId };
 
@@ -42,9 +51,24 @@ export class LabWorld {
   private robot!: THREE.Group;
   private armPivot!: THREE.Object3D;
   private gripper!: THREE.Object3D;
+  private armUpper!: THREE.Mesh;
+  private armElbow!: THREE.Mesh;
+  private armFore!: THREE.Mesh;
+  private fingers: THREE.Mesh[] = [];
   private wheels: THREE.Mesh[] = [];
   private eyes: THREE.Mesh[] = [];
   private lid!: THREE.Mesh;
+
+  /** 关节当前值 —— joint_command 读写的就是这张表 */
+  private joints: Record<string, number> = {
+    arm_shoulder_joint: -0.45,
+    arm_extension_joint: ARM_REST,
+    gripper_finger_joint: GRIPPER_OPEN,
+  };
+  /** 正在跑的导航 run —— navigate/status 查的是它 */
+  private navRuns = new Map<string, { state: string; detail: string }>();
+  private navSeq = 0;
+  private navAbort: { cancelled: boolean } | null = null;
 
   private objects = new Map<ObjectId, THREE.Object3D>();
   /** 每个物体现在在哪；'held' 表示在夹爪里 */
@@ -465,32 +489,40 @@ export class LabWorld {
     pivot.position.set(0.24, 0.62, 0.04);
     g.add(pivot);
 
+    /*
+      上臂和前臂都是伸缩段。一个纯转动的肩关节只能让末端在一个固定半径的
+      圆弧上跑，够得到茶几就够不到料理台 —— 所以这条臂有两个自由度，
+      URDF 里也是这么写的（arm_shoulder_joint + arm_extension_joint）。
+      两边必须一致，否则 Soma 服务出去的身体和屏幕上这个对不上。
+    */
     const upper = new THREE.Mesh(new THREE.BoxGeometry(0.075, 0.3, 0.075), this.mat(C.robot));
-    upper.position.set(0, -0.16, 0);
     upper.castShadow = true;
     pivot.add(upper);
 
     const elbow = new THREE.Mesh(new THREE.SphereGeometry(0.05, 10, 8), this.mat(C.robotDark));
-    elbow.position.set(0, -0.31, 0);
     pivot.add(elbow);
 
     const fore = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.24, 0.06), this.mat(C.metal));
-    fore.position.set(0, -0.43, 0);
     fore.castShadow = true;
     pivot.add(fore);
 
     const grip = new THREE.Object3D();
-    grip.position.set(0, -0.56, 0);
     pivot.add(grip);
     for (const dx of [-0.045, 0.045]) {
       const f = new THREE.Mesh(new THREE.BoxGeometry(0.022, 0.11, 0.05), this.mat(C.robotDark));
       f.position.set(dx, -0.05, 0);
       f.castShadow = true;
       grip.add(f);
+      this.fingers.push(f);
     }
     this.armPivot = pivot;
     this.gripper = grip;
+    this.armUpper = upper;
+    this.armElbow = elbow;
+    this.armFore = fore;
     pivot.rotation.x = -0.45;
+    this.setArmExtension(ARM_REST);
+    this.setGripperOpening(GRIPPER_OPEN);
 
     g.traverse((o) => o.layers.set(LAYER_SELF));
 
@@ -785,6 +817,374 @@ export class LabWorld {
     plant.rotation.z = 0;
     drops.forEach((dm) => this.scene.remove(dm));
     this.events.onAction?.(null);
+  }
+
+  /* ==========================================================================
+     米制层 —— primitive 契约真正调用的就是下面这些
+     ==========================================================================
+
+     上面那些 move(PlaceId) / reachFor(ObjectId) 是按地点名写的，方便本地
+     离线兜底用。但 Robonix 的 primitive 契约里没有地点名这种东西：底盘只认
+     「前进多少米、原地转多少度」，手臂只认笛卡尔位姿和关节名。名字住在
+     system/scene 那一层，由 goal_near 翻译成米。
+
+     这段就是那条分界线下面的部分。 */
+
+  /** 底盘当前位姿 */
+  basePose(): Pose2 {
+    return { x: this.robot.position.x, y: this.robot.position.z, yaw: this.robot.rotation.y };
+  }
+
+  /** 伸缩段的视觉：上臂和前臂按比例拉长，夹爪跟到末端 */
+  private setArmExtension(e: number) {
+    const ext = Math.min(ARM_MAX, Math.max(ARM_MIN, e));
+    const upperL = ext * 0.45;
+    const foreL = ext * 0.5;
+    this.armUpper.scale.y = upperL / 0.3;
+    this.armUpper.position.y = -upperL / 2;
+    this.armElbow.position.y = -upperL;
+    this.armFore.scale.y = foreL / 0.24;
+    this.armFore.position.y = -(upperL + foreL / 2);
+    this.gripper.position.y = -ext;
+    this.joints.arm_extension_joint = ext;
+  }
+
+  /** 夹爪张合：两根手指对开 */
+  private setGripperOpening(m: number) {
+    const o = Math.min(GRIPPER_OPEN, Math.max(GRIPPER_CLOSED, m));
+    this.fingers.forEach((f, i) => { f.position.x = (i === 0 ? -1 : 1) * (0.012 + o * 0.73); });
+    this.joints.gripper_finger_joint = o;
+  }
+
+  /**
+   * robonix/primitive/chassis/move —— 有界运动，不含全局路径规划。
+   *
+   * 契约的原话就是「without global path planning」，所以这里**不绕障**：
+   * 先转再直着走，撞上东西就在最后一个可站点停下并如实回报走了多远。
+   * 想绕开家具是 service/navigation 的事。
+   */
+  async chassisMove(cmd: {
+    forward_m?: number; rotate_deg?: number; duration_sec?: number;
+  }): Promise<{ state: string; travelled_m: number; x: number; y: number; yaw: number; detail: string }> {
+    const rot = cmd.rotate_deg ?? 0;
+    const fwd = cmd.forward_m ?? 0;
+    let detail = '';
+
+    if (Math.abs(rot) > 0.01) {
+      this.events.onAction?.(`turning ${rot > 0 ? 'left' : 'right'} ${Math.abs(rot).toFixed(0)}°`);
+      await this.turnTo(wrapAngle(this.robot.rotation.y + (rot * Math.PI) / 180));
+    }
+
+    let travelled = 0;
+    if (Math.abs(fwd) > 0.005) {
+      this.events.onAction?.(`driving ${fwd.toFixed(2)} m`);
+      sfx.moveStart();
+      const x0 = this.robot.position.x, z0 = this.robot.position.z;
+      const yaw = this.robot.rotation.y;
+      const dirX = Math.sin(yaw), dirZ = Math.cos(yaw);
+
+      // 先看能走多远 —— 沿途逐格试探，撞上就停
+      let limit = Math.abs(fwd);
+      const step = 0.05;
+      for (let d = step; d <= Math.abs(fwd) + 1e-6; d += step) {
+        const s = Math.sign(fwd) * d;
+        if (!isFree(this.grid, x0 + dirX * s, z0 + dirZ * s)) {
+          limit = Math.max(0, d - step);
+          detail = `blocked after ${limit.toFixed(2)} m — something is in the way`;
+          break;
+        }
+      }
+      travelled = Math.sign(fwd) * limit;
+
+      if (limit > 0.005) {
+        const ms = cmd.duration_sec ? cmd.duration_sec * 1000 : Math.max(240, limit * 520);
+        await this.tween(ms, (t) => {
+          this.robot.position.x = x0 + dirX * travelled * t;
+          this.robot.position.z = z0 + dirZ * travelled * t;
+          for (const wm of this.wheels) wm.rotation.x -= limit * 0.09;
+          this.robot.position.y = Math.abs(Math.sin(t * Math.PI * 7)) * 0.008;
+        });
+        this.robot.position.y = 0;
+      }
+      sfx.moveStop();
+    }
+
+    this.events.onAction?.(null);
+    const p = this.basePose();
+    return {
+      state: detail ? 'blocked' : 'done',
+      travelled_m: +travelled.toFixed(3),
+      x: +p.x.toFixed(3), y: +p.y.toFixed(3), yaw: +p.yaw.toFixed(4),
+      detail: detail || 'motion completed',
+    };
+  }
+
+  /** robonix/primitive/chassis/stop */
+  chassisStop(): { state: string; x: number; y: number; yaw: number } {
+    this.tweens = [];                    // 丢掉在飞的运动补间
+    if (this.navAbort) this.navAbort.cancelled = true;
+    this.robot.position.y = 0;
+    sfx.moveStop();
+    this.events.onAction?.(null);
+    const p = this.basePose();
+    return { state: 'stopped', x: +p.x.toFixed(3), y: +p.y.toFixed(3), yaw: +p.yaw.toFixed(4) };
+  }
+
+  /**
+   * robonix/service/navigation/navigate —— 带路径规划，走到给定位姿。
+   * 阻塞到走完才 resolve，和参考实现（nav2 wrapper 等 action 结束）一致。
+   */
+  async navigate(goal: { x: number; y: number; yaw?: number }): Promise<{
+    accepted: boolean; run_id: string; detail: string;
+  }> {
+    const runId = `run-${++this.navSeq}`;
+    const from: [number, number] = [this.robot.position.x, this.robot.position.z];
+
+    /*
+      目标压在家具里就直接拒绝。
+
+      规划器很容易把**物体自己的坐标**当成导航目标发过来 —— 杯子在茶几上，
+      那个点当然是站不进去的。之前 planPath 会把它吸附到最近的空格然后报
+      SUCCEEDED，机器人停在旁边、朝向随机，接着手臂报「偏了 44°」，
+      而导航那一步显示的是绿色的成功。整条链路上最误导人的一步就在这儿。
+
+      现在如实拒绝，并且把正确的做法直接写在错误里。
+    */
+    if (!isFree(this.grid, goal.x, goal.y)) {
+      const detail =
+        `(${goal.x.toFixed(2)}, ${goal.y.toFixed(2)}) is inside furniture or a wall — ` +
+        'the chassis cannot stand there. If you are trying to reach an object, call ' +
+        'robonix/system/scene/goal_near first and navigate to the pose it returns ' +
+        '(including its yaw); an object\'s own coordinates are never a valid goal.';
+      this.navRuns.set(runId, { state: 'FAILED', detail });
+      return { accepted: false, run_id: runId, detail };
+    }
+
+    const path = planPath(this.grid, from, [goal.x, goal.y]);
+
+    if (!path) {
+      const detail = 'no collision-free path to that pose';
+      this.navRuns.set(runId, { state: 'FAILED', detail });
+      return { accepted: false, run_id: runId, detail };
+    }
+
+    this.navRuns.set(runId, { state: 'RUNNING', detail: `${path.length} waypoints` });
+    const abort = { cancelled: false };
+    this.navAbort = abort;
+
+    this.events.onAction?.('navigating');
+    sfx.moveStart();
+    let cur = from;
+    let metres = 0;
+    for (const wp of path.slice(1)) {
+      if (abort.cancelled) break;
+      const dist = Math.hypot(wp[0] - cur[0], wp[1] - cur[1]);
+      if (dist < 0.03) { cur = wp; continue; }
+      await this.turnTo(Math.atan2(wp[0] - cur[0], wp[1] - cur[1]));
+      if (abort.cancelled) break;
+      const sx = cur[0], sz = cur[1];
+      await this.tween(Math.max(240, dist * 520), (t) => {
+        this.robot.position.x = sx + (wp[0] - sx) * t;
+        this.robot.position.z = sz + (wp[1] - sz) * t;
+        for (const wm of this.wheels) wm.rotation.x -= dist * 0.09;
+        this.robot.position.y = Math.abs(Math.sin(t * Math.PI * 7)) * 0.008;
+      });
+      this.robot.position.y = 0;
+      cur = wp;
+      metres += dist;
+    }
+    sfx.moveStop();
+    this.events.onAction?.(null);
+    this.navAbort = null;
+
+    if (abort.cancelled) {
+      const detail = `cancelled after ${metres.toFixed(2)} m`;
+      this.navRuns.set(runId, { state: 'CANCELED', detail });
+      return { accepted: true, run_id: runId, detail };
+    }
+
+    /*
+      收尾朝向。goal_near 给出的位姿里带着「站这儿、面向这件家具」的 yaw，
+      规划器会把它填进目标四元数，所以正常路径下这里就是转到位。
+
+      没给朝向（退化四元数）时按行进方向停下 —— 那是导航的通用做法，
+      也如实反映了「你没告诉我要朝哪边」。
+    */
+    if (goal.yaw !== undefined) await this.turnTo(goal.yaw, 180);
+
+    const detail = `drove ${metres.toFixed(2)} m along ${path.length} waypoints`;
+    this.navRuns.set(runId, { state: 'SUCCEEDED', detail });
+    return { accepted: true, run_id: runId, detail };
+  }
+
+  navStatus(runId: string): { known: boolean; state: string; detail: string } {
+    const r = this.navRuns.get(runId);
+    return r ? { known: true, ...r } : { known: false, state: 'UNKNOWN', detail: 'no such run' };
+  }
+
+  navCancel(runId: string): { accepted: boolean; detail: string } {
+    const r = this.navRuns.get(runId);
+    if (!r) return { accepted: false, detail: 'no such run' };
+    if (r.state !== 'RUNNING') return { accepted: false, detail: `run is already ${r.state}` };
+    if (this.navAbort) this.navAbort.cancelled = true;
+    return { accepted: true, detail: 'cancelling' };
+  }
+
+  /**
+   * robonix/primitive/arm/pos_command —— 末端到一个笛卡尔位姿。
+   * IK 由 provider 负责，契约里明说了。够不着就抛，不去半途而废。
+   */
+  async armTo(target: Pose): Promise<{ reached: { x: number; y: number; z: number } }> {
+    const sol = solveArm(this.basePose(), target);
+    if (!isArmSolution(sol)) {
+      // 说清楚是哪一维不行、该怎么补救 —— 这条话会一路走到 VLM 面前
+      throw new Error(`cannot reach that pose: ${sol.detail}`);
+    }
+    this.events.onAction?.('moving the arm');
+    const p0 = this.joints.arm_shoulder_joint;
+    const e0 = this.joints.arm_extension_joint;
+    await this.tween(420, (t) => {
+      this.armPivot.rotation.x = p0 + (sol.pitch - p0) * t;
+      this.setArmExtension(e0 + (sol.extension - e0) * t);
+    });
+    this.joints.arm_shoulder_joint = sol.pitch;
+    this.armPivot.rotation.x = sol.pitch;
+    this.events.onAction?.(null);
+    const reached = poseToSim(armForward(this.basePose(), sol));
+    return { reached: { x: +reached.x.toFixed(3), y: +reached.z.toFixed(3), z: +reached.height.toFixed(3) } };
+  }
+
+  /**
+   * robonix/primitive/arm/joint_command —— 按名字给关节下位置。
+   * 夹爪就是其中一个具名关节，契约注释里就是这么规定的：合拢=抓住。
+   */
+  async jointCommand(names: string[], positions: number[]): Promise<{
+    name: string[]; position: number[]; grasped?: string | null; released?: string | null;
+  }> {
+    let grasped: string | null = null;
+    let released: string | null = null;
+
+    for (let i = 0; i < names.length; i++) {
+      const n = names[i];
+      const v = positions[i];
+      if (!(JOINT_NAMES as readonly string[]).includes(n)) {
+        throw new Error(`unknown joint "${n}". This arm has: ${JOINT_NAMES.join(', ')}`);
+      }
+      if (!Number.isFinite(v)) throw new Error(`joint "${n}" needs a numeric position`);
+
+      if (n === 'arm_shoulder_joint') {
+        this.events.onAction?.('moving the arm');
+        const a0 = this.armPivot.rotation.x;
+        await this.tween(320, (t) => { this.armPivot.rotation.x = a0 + (v - a0) * t; });
+        this.joints.arm_shoulder_joint = v;
+        this.events.onAction?.(null);
+      } else if (n === 'arm_extension_joint') {
+        const e0 = this.joints.arm_extension_joint;
+        await this.tween(320, (t) => this.setArmExtension(e0 + (v - e0) * t));
+      } else {
+        // 夹爪
+        if (v <= 0.02) grasped = await this.closeGripperMetric();
+        else released = await this.openGripperMetric(v);
+      }
+    }
+    return {
+      name: [...JOINT_NAMES],
+      position: JOINT_NAMES.map((n) => +this.joints[n].toFixed(4)),
+      grasped, released,
+    };
+  }
+
+  /** 合拢：抓住末端附近的东西。附近没东西就失败 —— 不凭空变一个出来 */
+  private async closeGripperMetric(): Promise<string> {
+    if (this.held) throw new Error(`the gripper already holds ${this.held}`);
+    const gp = new THREE.Vector3();
+    this.gripper.getWorldPosition(gp);
+
+    let best: ObjectId | null = null;
+    let bd = 0.26;                       // 夹爪的有效抓取半径
+    for (const [id, mesh] of this.objects) {
+      if (this.placeOf.get(id) === 'held') continue;
+      const wp = new THREE.Vector3();
+      mesh.getWorldPosition(wp);
+      const d = wp.distanceTo(gp);
+      if (d < bd) { bd = d; best = id; }
+    }
+    if (!best) {
+      throw new Error(
+        'the gripper closed on nothing — no object within 0.26 m of the end effector. ' +
+        'Send arm/pos_command to the object pose first.',
+      );
+    }
+
+    this.events.onAction?.(`grasping ${OBJECTS[best].label}`);
+    sfx.grasp();
+    await this.tween(240, (t) => this.setGripperOpening(GRIPPER_OPEN * (1 - t)));
+    const o = this.objects.get(best)!;
+    this.gripper.add(o);
+    o.position.set(0, -0.12, 0);
+    o.traverse((c) => c.layers.set(0));   // 拿在手里的东西自己要看得见
+    this.held = best;
+    this.placeOf.set(best, 'held');
+    if (this.marker) { this.scene.remove(this.marker); this.marker = null; }
+    this.events.onAction?.(null);
+    return best;
+  }
+
+  /** 张开：松手，东西落到脚下最近的台面上 */
+  private async openGripperMetric(opening: number): Promise<string | null> {
+    this.events.onAction?.('opening the gripper');
+    await this.tween(240, (t) => this.setGripperOpening(GRIPPER_OPEN * t));
+    this.setGripperOpening(opening);
+    if (!this.held) { this.events.onAction?.(null); return null; }
+
+    const obj = this.held;
+    const o = this.objects.get(obj)!;
+    const target = this.nearestPlace();
+    sfx.release();
+    this.scene.add(o);
+    o.traverse((c) => c.layers.set(0));
+    this.moveObjectTo(obj, target);
+    this.held = null;
+
+    if (target === 'bin') {
+      await this.tween(280, (t) => { this.lid.rotation.z = -t * 0.85; this.lid.position.x = 3.0 - t * 0.13; });
+      await this.tween(280, (t) => { this.lid.rotation.z = -0.85 + t * 0.85; this.lid.position.x = 2.87 + t * 0.13; });
+    }
+    this.events.onAction?.(null);
+    return obj;
+  }
+
+  /** robonix/primitive/arm/end_pose */
+  endPoseMetric(): Pose {
+    const wp = new THREE.Vector3();
+    this.gripper.getWorldPosition(wp);
+    return poseFromSim(wp.x, wp.z, wp.y, this.robot.rotation.y);
+  }
+
+  /** 给 semantic-map 用的世界视图 */
+  worldView(): WorldView {
+    const placeOf: Record<string, PlaceId | 'held'> = {};
+    const objectPos: Record<string, [number, number, number]> = {};
+    for (const [id, p] of this.placeOf) placeOf[id] = p;
+    for (const [id, mesh] of this.objects) {
+      const wp = new THREE.Vector3();
+      mesh.getWorldPosition(wp);
+      objectPos[id] = [+wp.x.toFixed(3), +wp.y.toFixed(3), +wp.z.toFixed(3)];
+    }
+    return {
+      placeOf, objectPos,
+      robot: {
+        x: +this.robot.position.x.toFixed(3),
+        z: +this.robot.position.z.toFixed(3),
+        yaw: +this.robot.rotation.y.toFixed(4),
+      },
+      holding: this.held,
+    };
+  }
+
+  /** 停靠点解算 —— goal_near 要用，可站性判断在导航侧 */
+  standFor(place: PlaceId): [number, number] {
+    return resolveStand(this.grid, place);
   }
 
   /* ====================================================== 相机 / 状态 */

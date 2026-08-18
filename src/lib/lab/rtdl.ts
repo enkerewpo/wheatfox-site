@@ -144,6 +144,87 @@ export function countLeaves(n: RtdlNode): number {
   return n.op === 'do' ? 1 : n.children.reduce((a, c) => a + countLeaves(c), 0);
 }
 
+/* ========================================================================== */
+/* 服务器推过来的计划                                                          */
+/* ========================================================================== */
+
+/**
+ * pilot 的 Plan 在线上是**扁平的**：一个节点数组 + 一个根下标，孩子用下标引用。
+ * 上面的渲染器要的是嵌套结构，所以在这里转一次。
+ *
+ * 刻意不在这里做任何解释或美化 —— 描述、能力名、参数全部是模型和 executor
+ * 自己产生的，原样画出来。这个面板的价值就在于它是真的。
+ */
+export type WirePlanNode = {
+  kind: string;
+  children: number[];
+  op_id: string;
+  description: string;
+  call: { provider_id: string; contract_id: string; args: string } | null;
+};
+
+export type WirePlan = {
+  plan_id: string;
+  round: number;
+  root: number;
+  nodes: WirePlanNode[];
+};
+
+const WIRE_STATE: Record<string, NodeStatus> = {
+  PENDING: 'pending', RUNNING: 'running', SUCCEEDED: 'succeeded',
+  FAILED: 'failed', CANCELED: 'canceled', TIMEOUT: 'failed', PAUSED: 'pending',
+};
+
+export function fromWirePlan(plan: WirePlan): RtdlNode | null {
+  const seen = new Set<number>();
+
+  const build = (i: number): RtdlNode | null => {
+    const n = plan.nodes[i];
+    // 环和越界都不该出现，但真出现了也不能把页面挂掉
+    if (!n || seen.has(i)) return null;
+    seen.add(i);
+
+    const common = { op_id: Number(n.op_id) || i, description: n.description || '(no description)' };
+
+    if (n.kind === 'do') {
+      let args: Record<string, unknown> = {};
+      try { args = n.call?.args ? JSON.parse(n.call.args) : {}; } catch { /* 原样留空 */ }
+      return {
+        ...common, op: 'do',
+        // 契约 id 的最后一段就是 pilot 目录里的短名，画长的会撑爆
+        cap: n.call?.contract_id?.replace(/^robonix\//, '') ?? '(no capability)',
+        args,
+      };
+    }
+    return {
+      ...common,
+      op: n.kind === 'parallel' ? 'parallel' : 'sequence',
+      children: n.children.map(build).filter((c): c is RtdlNode => c !== null),
+    };
+  };
+
+  return build(plan.root);
+}
+
+/** 把一条 node_state 事件打到树上。按 op_id 找，因为下标只在本轮有效 */
+export function applyNodeState(
+  root: RtdlNode,
+  ev: { op_id: string; state: string; detail?: string;
+        result?: { success: boolean; output: string; error: string } },
+): boolean {
+  const id = Number(ev.op_id);
+  const walk = (n: RtdlNode): boolean => {
+    if (n.op_id === id) {
+      n.status = WIRE_STATE[ev.state] ?? 'pending';
+      const err = ev.result?.error || (n.status === 'failed' ? ev.detail : '');
+      if (err) n.error = err;
+      return true;
+    }
+    return n.op !== 'do' && n.children.some(walk);
+  };
+  return walk(root);
+}
+
 function countStatus(n: RtdlNode, s: NodeStatus): number {
   if (n.op === 'do') return n.status === s ? 1 : 0;
   return n.children.reduce((a, c) => a + countStatus(c, s), 0);

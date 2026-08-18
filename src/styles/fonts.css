@@ -41,13 +41,20 @@
   src: url('/fonts/fira-sans-latin-700-normal.woff2') format('woff2');
 }
 
-/* 变量字体，一个文件覆盖 200-900 全字重 */
+/*
+  变量字体，一个文件覆盖 200-900 全字重。
+
+  src 必须写成 format('woff2')，不能写 format('woff2-variations')——
+  后者是早期草案语法，Safari（含 iOS）不认，整条 @font-face 会被静默丢弃，
+  于是手机上退回系统等宽字体，和桌面完全不一样。
+  现代写法是 format('woff2') 加可选的 tech(variations)。
+*/
 @font-face {
   font-family: 'Source Code Pro Variable';
   font-style: normal;
   font-weight: 200 900;
   font-display: swap;
-  src: url('/fonts/source-code-pro-latin-wght-normal.woff2') format('woff2-variations');
+  src: url('/fonts/source-code-pro-latin-wght-normal.woff2') format('woff2');
 }
 
 @font-face {

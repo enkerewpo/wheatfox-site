@@ -208,7 +208,9 @@ export function planLocally(task: string, snap: WorldSnapshot): RtdlEnvelope | n
       seq(`bring ${OBJECTS[obj].label} to the sofa`, [
         fetch(obj, at),
         doNode('bring it over to the sofa', 'chassis.move', { target: 'sofa' }),
-        doNode('hand it over', 'arm.release', { target: 'sofa' }),
+        // 松手就是把夹爪关节张开 —— 契约里没有独立的 release 能力
+        doNode('open the gripper', 'arm.joint_command',
+          { name: 'gripper_finger_joint', position: '0.045' }),
         say(`Here is ${OBJECTS[obj].label}.`),
       ]),
       `${obj} has been brought to the sofa`);

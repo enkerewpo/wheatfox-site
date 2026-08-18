@@ -96,13 +96,28 @@
     const pause = () => { if (timer !== undefined) { clearInterval(timer); timer = undefined; } };
 
     fit();
+
+    /*
+      手机上滚动时地址栏会收起/展开，viewport 高度随之变化，浏览器就发 resize。
+      如果每次 resize 都重建网格，滚动过程中画面会不停重置，看着像抽搐。
+      所以：只在**宽度**真的变了才重建，并且加防抖。
+    */
+    let lastW = canvas.clientWidth;
+    let resizeTimer: number | undefined;
+    window.addEventListener('resize', () => {
+      const w = canvas.clientWidth;
+      if (w === lastW) return;          // 只有高度变（地址栏）—— 不动
+      lastW = w;
+      clearTimeout(resizeTimer);
+      resizeTimer = window.setTimeout(fit, 180);
+    });
+
     // 只在标签页可见时跑，别空转耗电
     document.addEventListener('visibilitychange', () => (document.hidden ? pause() : play()));
     // 主题切换要立刻重画，不然颜色对不上
     new MutationObserver(draw).observe(document.documentElement, {
       attributes: true, attributeFilter: ['data-theme'],
     });
-    window.addEventListener('resize', fit);
     btn?.addEventListener('click', fit);
 
     if (!window.matchMedia('(prefers-reduced-motion: reduce)').matches) play();

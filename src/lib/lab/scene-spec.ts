@@ -223,17 +223,33 @@ export function surfaceY(place: PlaceId): number {
 /**
  * 物体放在某地点时的世界坐标。
  * `slot` 是同一台面上的第几个，用来横向错开，避免互相重叠。
+ *
+ * 摆放要**偏向机器人接近的那一侧**，不能居中：机器人停在离家具外沿
+ * CLEARANCE(0.62 m) 的地方，如果东西还摆在台面正中，水平够取距离就是
+ * 0.62 + 半个台面深度 —— 架子那种 0.86 深的家具直接超过 1 m，
+ * 一条 0.88 的臂怎么都够不着。人放东西本来也是放在手边那一侧。
  */
 export function restingPosition(
   obj: ObjectId, place: PlaceId, slot: number,
 ): [number, number, number] {
   const p = PLACES[place];
   const spec = OBJECTS[obj];
-  // 三个一排，多了往后排
+  const f = BY_ID.get(p.on)!;
+  const [fw, , fd] = f.size;
+
+  // 三个一排，多了往台面深处排
   const col = slot % 3;
   const row = Math.floor(slot / 3);
-  const dx = (col - 1) * 0.26;
-  const dz = row * 0.24;
+
+  // 从台面中心往接近侧推，但留 0.1 m 边距免得挂在外沿上
+  const push = (span: number) => Math.max(0, span / 2 - 0.12);
+  let dx = 0, dz = 0;
+  switch (p.approach) {
+    case 'front': dz = push(fd) - row * 0.2; dx = (col - 1) * 0.24; break;
+    case 'back':  dz = -push(fd) + row * 0.2; dx = (col - 1) * 0.24; break;
+    case 'right': dx = push(fw) - row * 0.2; dz = (col - 1) * 0.24; break;
+    case 'left':  dx = -push(fw) + row * 0.2; dz = (col - 1) * 0.24; break;
+  }
   return [p.spot[0] + dx, surfaceY(place) + spec.rest, p.spot[1] + dz];
 }
 
