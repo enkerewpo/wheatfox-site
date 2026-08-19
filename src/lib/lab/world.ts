@@ -13,14 +13,15 @@
 
 import * as THREE from 'three';
 import {
-  C, ROOM, FURNITURE, PLACES, OBJECTS, restingPosition, surfaceY,
+  C, ROOM, FURNITURE, PLACES, OBJECTS, restingPosition, surfaceY, checkReachability,
   type PlaceId, type ObjectId,
 } from './scene-spec';
 import { buildGrid, planPath, resolveStand, isFree, type Grid } from './nav';
 import { sfx } from './sfx';
 import {
   solveArm, isArmSolution, armForward, poseFromSim, poseToSim, wrapAngle,
-  ARM_MIN, ARM_MAX, GRIPPER_OPEN, GRIPPER_CLOSED, JOINT_NAMES,
+  ARM_MIN, ARM_MAX, SHOULDER_HEIGHT, SHOULDER_FORWARD,
+  GRIPPER_OPEN, GRIPPER_CLOSED, JOINT_NAMES,
   type Pose, type Pose2,
 } from './pose';
 import type { WorldView } from './semantic-map';
@@ -107,6 +108,23 @@ export class LabWorld {
     this.robotCam = new THREE.PerspectiveCamera(68, 4 / 3, 0.05, 40);
     this.robotCam.layers.set(0);
     this.camTarget = new THREE.WebGLRenderTarget(512, 384);
+
+    /*
+      开局先验一遍：每个地点的台面是不是真的够得着。
+      不通过就抛 —— 这类几何错配不报错、只表现为「家务永远做不完」，
+      与其让人对着一个永远失败的机器人猜，不如当场说清哪儿不对。
+    */
+    const issues = checkReachability(
+      (pl) => resolveStand(this.grid, pl),
+      SHOULDER_HEIGHT, SHOULDER_FORWARD, ARM_MIN, ARM_MAX,
+    );
+    if (issues.length) {
+      throw new Error(
+        'scene is unreachable at: ' +
+        issues.map((i) => `${i.place} (needs ${i.needed} m at ${i.height} m high, ` +
+                          `${i.distance} m away; arm spans ${ARM_MIN}-${ARM_MAX} m)`).join('; '),
+      );
+    }
 
     this.buildLights();
     this.buildRoom();

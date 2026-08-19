@@ -23,7 +23,10 @@ const year = new Date().getFullYear();
       {footerCredits.map((c, i) => (
         <>
           {i > 0 && (i === footerCredits.length - 1 ? ' and ' : ', ')}
-          <a href={c.href} target="_blank" rel="noopener">{c.label}</a>
+          <a class="credit" href={c.href} target="_blank" rel="noopener">
+            {c.icon && <img class="credit-icon" src={c.icon} alt="" width="20" height="20" loading="lazy" decoding="async" />}
+            {c.label}
+          </a>
         </>
       ))}
     </div>
@@ -68,4 +71,20 @@ const year = new Date().getFullYear();
     margin: 0 var(--sp-2);
     color: var(--border-strong);
   }
+
+  /* 鸣谢里的小图标（Anubis 那只吉祥物）。
+     和文字基线对齐，尺寸写死在 img 上防止加载时布局跳动。 */
+  .credit {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+  }
+  .credit-icon {
+    height: 1.35em;
+    width: auto;
+    vertical-align: -0.3em;
+    /* 它是张彩图，暗色下压一点亮度免得太跳 */
+    opacity: 0.9;
+  }
+  :root[data-theme='dark'] .credit-icon { opacity: 0.8; }
 </style>

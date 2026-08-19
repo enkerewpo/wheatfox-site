@@ -48,10 +48,19 @@ export const beian = {
   policeUrl: 'https://beian.mps.gov.cn/',
 } as const;
 
-/** 页脚鸣谢。留空数组即不显示。 */
-export const footerCredits: { label: string; href: string }[] = [
+/**
+ * 页脚鸣谢。留空数组即不显示。
+ *
+ * `icon` 可选 —— Anubis 那只吉祥物是它自己在 /.within.website/… 下服务的，
+ * 所以直接引它的路径，不往仓库里复制一份图片。
+ */
+export const footerCredits: { label: string; href: string; icon?: string }[] = [
   { label: 'Aliyun', href: 'https://www.aliyun.com/' },
-  { label: 'Anubis', href: 'https://anubis.techaro.lol/' },
+  {
+    label: 'Anubis',
+    href: 'https://anubis.techaro.lol/',
+    icon: '/.within.website/x/cmd/anubis/static/img/happy.webp',
+  },
 ];
 
 /** 访问统计。busuanzi 无后端，关掉就设 false。 */

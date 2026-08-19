@@ -77,6 +77,10 @@ export const FURNITURE: Furniture[] = [
   { id: 'sink-basin',  size: [0.68, 0.16, 0.46], pos: [-2.3, 0.83, -2.9], color: C.metal, surface: true },
 
   { id: 'fridge',      size: [0.82, 1.85, 0.72], pos: [2.35, 0.925, -2.85], color: C.fridge, surface: false },
+  /* 冰箱内部的一层隔板。食材放在冰箱**里**，不是顶上 —— 之前 PLACES.fridge
+     指向整个冰箱盒体，台面就成了 1.90 m 高的顶面，手臂根本够不着，
+     「做饭」永远拿不到食材。 */
+  { id: 'fridge-shelf', size: [0.70, 0.04, 0.56], pos: [2.35, 0.95, -2.80], color: C.worktop, surface: true },
 
   // ---- 架子（左墙）----
   { id: 'shelf-frame', size: [0.10, 1.5, 0.9], pos: [-3.55, 0.95, -1.2], color: C.woodDark, surface: false },
@@ -143,11 +147,15 @@ const PLACE_DEFS: PlaceDef[] = [
   { id: 'sink',         label: 'the sink',         on: 'sink-basin', approach: 'front' },
   { id: 'counter',      label: 'the counter',      on: 'worktop',    approach: 'front' },
   { id: 'stove',        label: 'the stove',        on: 'stove-top',  approach: 'front' },
-  { id: 'fridge',       label: 'the fridge',       on: 'fridge',     approach: 'front' },
-  { id: 'shelf',        label: 'the shelf',        on: 'shelf-b2',   approach: 'right' },
+  { id: 'fridge',       label: 'the fridge',       on: 'fridge-shelf', approach: 'front' },
+  { id: 'shelf',        label: 'the shelf',        on: 'shelf-b1',   approach: 'right' },
   { id: 'table',        label: 'the dining table', on: 'table-top',  approach: 'front' },
   { id: 'coffee-table', label: 'the coffee table', on: 'coffee-top', approach: 'front' },
-  { id: 'sofa',         label: 'the sofa',         on: 'sofa-seat',  approach: 'front' },
+  /* 沙发从**侧面**接近。
+     'front' 会把停靠点算到 +z 的墙外去（那条规则默认房间中心在 +z，对厨房
+     成立、对靠后墙的沙发不成立）；'back' 又落在沙发和茶几之间 —— 那道缝
+     只有 0.36 m，机器人直径 0.68，物理上进不去。侧面是唯一站得住的地方。 */
+  { id: 'sofa',         label: 'the sofa',         on: 'sofa-seat',  approach: 'right' },
   { id: 'bin',          label: 'the bin',          on: 'bin',        approach: 'front' },
 ];
 
@@ -251,7 +259,11 @@ export function restingPosition(
   const f = BY_ID.get(p.on)!;
   const [fw, , fd] = f.size;
 
-  // 三个一排，多了往台面深处排
+  /*
+    间距必须大于夹爪的抓取半径（nav 里的 0.26 m），否则「抓 A」和「抓 B」
+    在几何上就是同一个动作 —— 之前 0.24 的列距正好卡在临界点，架子上
+    盘子和面条挨着，指名要面条却夹到盘子。
+  */
   const col = slot % 3;
   const row = Math.floor(slot / 3);
 
@@ -259,10 +271,10 @@ export function restingPosition(
   const push = (span: number) => Math.max(0, span / 2 - 0.12);
   let dx = 0, dz = 0;
   switch (p.approach) {
-    case 'front': dz = push(fd) - row * 0.2; dx = (col - 1) * 0.24; break;
-    case 'back':  dz = -push(fd) + row * 0.2; dx = (col - 1) * 0.24; break;
-    case 'right': dx = push(fw) - row * 0.2; dz = (col - 1) * 0.24; break;
-    case 'left':  dx = -push(fw) + row * 0.2; dz = (col - 1) * 0.24; break;
+    case 'front': dz = push(fd) - row * 0.22; dx = (col - 1) * 0.32; break;
+    case 'back':  dz = -push(fd) + row * 0.22; dx = (col - 1) * 0.32; break;
+    case 'right': dx = push(fw) - row * 0.22; dz = (col - 1) * 0.32; break;
+    case 'left':  dx = -push(fw) + row * 0.22; dz = (col - 1) * 0.32; break;
   }
   return [p.spot[0] + dx, surfaceY(place) + spec.rest, p.spot[1] + dz];
 }
@@ -272,3 +284,37 @@ export const RECIPES: Record<string, { needs: ObjectId[]; label: string }> = {
   'tomato-egg': { needs: ['tomato', 'egg'], label: 'tomato and egg' },
   'noodles':    { needs: ['noodles', 'egg'], label: 'noodles' },
 };
+
+/* -------------------------------------------------------------------------- */
+/* 自检 —— 每个地点都必须真的够得着                                              */
+/* -------------------------------------------------------------------------- */
+
+/**
+ * 检查每个地点的台面是否落在手臂的可达包络里。
+ *
+ * 这类错配已经坑过三次，而且每次都不报错、只表现为「任务做不完」：
+ * 冰箱的「台面」是 1.90 m 的顶面、架子用了太高的一层、沙发的停靠点算到了
+ * 墙外。几何和运动学各自看都没问题，凑一起就是够不着 —— 只有算一遍才知道。
+ *
+ * 所以在这里主动算。`assertReachable()` 在世界构造时调用，不通过就直接抛，
+ * 宁可开局白屏也不要给人一个永远做不完家务的机器人。
+ */
+export type ReachIssue = { place: PlaceId; needed: number; height: number; distance: number };
+
+export function checkReachability(
+  resolve: (p: PlaceId) => [number, number],
+  shoulderHeight: number, shoulderForward: number, armMin: number, armMax: number,
+): ReachIssue[] {
+  const out: ReachIssue[] = [];
+  const probe = Object.keys(OBJECTS)[0] as ObjectId;
+  for (const id of Object.keys(PLACES) as PlaceId[]) {
+    const [sx, sz] = resolve(id);
+    const [ox, oy, oz] = restingPosition(probe, id, 0);
+    const dist = Math.hypot(ox - sx, oz - sz);
+    const needed = Math.hypot(dist - shoulderForward, shoulderHeight - oy);
+    if (needed < armMin || needed > armMax) {
+      out.push({ place: id, needed: +needed.toFixed(2), height: +oy.toFixed(2), distance: +dist.toFixed(2) });
+    }
+  }
+  return out;
+}

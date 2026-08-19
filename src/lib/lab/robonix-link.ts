@@ -32,6 +32,7 @@ import {
   allNodes, findNode, relationsOf, nearbyOf, goalNear, robotArea,
   surfaceNodes, objectNodes,
 } from './semantic-map';
+import { makeSkills } from './skills';
 
 export type LinkState = 'connecting' | 'online' | 'offline' | 'busy';
 
@@ -56,6 +57,7 @@ type Handler = (args: Record<string, any>) => Promise<unknown> | unknown;
  */
 export function makeHandlers(world: LabWorld): Record<string, Handler> {
   const view = () => world.worldView();
+  const skills = makeSkills(world);
 
   /** 把语义地图里的一个节点变成 geometry_msgs/Pose */
   const nodePose = (id: string): Pose | null => {
@@ -170,6 +172,16 @@ export function makeHandlers(world: LabWorld): Record<string, Handler> {
       view(), String(a.object_id ?? ''),
       (place: PlaceId) => world.standFor(place),
     ),
+
+    /* --------------------------------------------------------- skill
+       任务级行为。这些不是「把整个任务封成一步」—— pick 和 place 仍然分开，
+       做饭还是要规划器自己想清楚先拿什么、再上灶。组合归它，可靠性归系统。 */
+
+    'skill.pick':  (a) => skills.pick(String(a.object_id ?? '')),
+    'skill.place': (a) => skills.place(String(a.destination_id ?? '')),
+    'skill.cook':  (a) => skills.cook(String(a.dish ?? '')),
+    'skill.wash':  () => skills.wash(),
+    'skill.water': (a) => skills.water(String(a.plant_id ?? 'plant')),
   };
 }
 
@@ -273,6 +285,9 @@ export type LinkConfig = {
   base: string;
 };
 
+/** 四个 provider 各一条线，名字和 nginx 里的 location 一一对应 */
+const LINES = ['sim', 'nav', 'scene', 'skills'] as const;
+
 export class RobonixLink {
   private lines: Line[] = [];
   readonly states = new Map<string, LinkState>();
@@ -287,7 +302,7 @@ export class RobonixLink {
       },
     };
     // 路径和 nginx 里的三个 location 对应
-    for (const name of ['sim', 'nav', 'scene']) {
+    for (const name of LINES) {
       this.lines.push(new Line(name, `${cfg.base}/${name}`, handlers, wrapped));
     }
   }
@@ -295,14 +310,14 @@ export class RobonixLink {
   start() { for (const l of this.lines) l.connect(); }
   stop() { for (const l of this.lines) l.close(); }
 
-  /** 三条都在线才算这具身体真的接上了 */
+  /** 四条都在线才算这具身体真的接上了 */
   get online(): boolean {
-    return ['sim', 'nav', 'scene'].every((n) => this.states.get(n) === 'online');
+    return LINES.every((n) => this.states.get(n) === 'online');
   }
 
   /** 有 provider 说「已经被别人占了」—— 排队，不是连不上 */
   get busy(): boolean {
-    return ['sim', 'nav', 'scene'].some((n) => this.states.get(n) === 'busy');
+    return LINES.some((n) => this.states.get(n) === 'busy');
   }
 }
 
