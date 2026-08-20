@@ -78,8 +78,12 @@ export type LinkEvents = {
             waiting: number, message?: string) => void;
   /** 某一条线报了角色（内部用来汇总「四条是否一致」） */
   onLineRole?: (which: string, role: 'driver' | 'spectator') => void;
-  /** 旁观时收到的世界状态 —— 机器人只有一台，画面必须和司机一致 */
-  onWorldState?: (snapshot: any, action?: string | null) => void;
+  /**
+   * 世界状态。
+   * `isRestore` 为真表示这是接手/刷新时服务端交回来的那一份 —— 即使自己是
+   * 司机也要照单接收，否则刷新后机器人会退回初始状态。
+   */
+  onWorldState?: (snapshot: any, action?: string | null, isRestore?: boolean) => void;
   /** 座位被别人占着 —— 告诉界面是谁、还有几个人在等 */
   onSeatBusy?: (holder: SeatHolder | null, waiting: number) => void;
   /** 自己的座位快到期了 */
@@ -284,7 +288,7 @@ class Line {
         this.events.onRole?.(msg.role, msg.holder ?? null,
                              Number(msg.waiting) || 0, msg.message);
         // 接手时把上一个人留下的世界原样接过来，不重置
-        if (msg.restore) this.events.onWorldState?.(msg.restore, null);
+        if (msg.restore) this.events.onWorldState?.(msg.restore, null, true);
         return;
       }
       if (msg.event === 'state') {

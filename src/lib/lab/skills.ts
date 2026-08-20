@@ -106,11 +106,16 @@ export function makeSkills(world: LabWorld) {
       */
       const got = world.snapshot().holding;
       if (got !== id) {
+        /*
+          primitive 那层「合上夹爪」永远是成功的 —— 关节动了就是动了，
+          空着合一下也是正当动作。但 pick 是**指名要这个东西**的，
+          空手而归就是失败，这个判断只能放在 skill 层。
+        */
         return no(
           got
             ? `aimed at ${OBJECTS[id].label} but the gripper closed on ${OBJECTS[got as ObjectId]?.label ?? got}`
               + ' — they are too close together on that surface. Move the other one first.'
-            : `the gripper closed on nothing at ${OBJECTS[id].label}'s position`,
+            : `the gripper closed on nothing where ${OBJECTS[id].label} should have been`,
         );
       }
       return ok(`picked up ${OBJECTS[id].label} from ${PLACES[at as PlaceId].label}`);

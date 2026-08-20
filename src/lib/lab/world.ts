@@ -1100,7 +1100,7 @@ export class LabWorld {
         const e0 = this.joints.arm_extension_joint;
         await this.tween(320, (t) => this.setArmExtension(e0 + (v - e0) * t));
       } else {
-        // 夹爪
+        // 夹爪。合拢/张开都只是动作，抓没抓到东西在返回里如实报告。
         if (v <= 0.02) grasped = await this.closeGripperMetric();
         else released = await this.openGripperMetric(v);
       }
@@ -1112,9 +1112,18 @@ export class LabWorld {
     };
   }
 
-  /** 合拢：抓住末端附近的东西。附近没东西就失败 —— 不凭空变一个出来 */
-  private async closeGripperMetric(): Promise<string> {
-    if (this.held) throw new Error(`the gripper already holds ${this.held}`);
+  /**
+   * 合拢夹爪。
+   *
+   * 这是**关节位置指令**：让夹爪合上，它合上了就是成功。附近没有东西时
+   * 只是没抓到，返回 null —— 不是错误。真夹爪也可以空着开合。
+   *
+   * 早先这里在「没夹到东西」时抛异常，于是「让手臂和底盘一起动起来跳个舞」
+   * 这种完全正当的请求会被判成失败。抓没抓到是**结果**，判断这个结果算不算
+   * 失败是 skill 的事（pick 说要拿杯子却空手而归，那才是失败）。
+   */
+  private async closeGripperMetric(): Promise<string | null> {
+    if (this.held) return this.held;      // 已经拿着了，再合一次不算错
     const gp = new THREE.Vector3();
     this.gripper.getWorldPosition(gp);
 
@@ -1128,10 +1137,11 @@ export class LabWorld {
       if (d < bd) { bd = d; best = id; }
     }
     if (!best) {
-      throw new Error(
-        'the gripper closed on nothing — no object within 0.26 m of the end effector. ' +
-        'Send arm/pos_command to the object pose first.',
-      );
+      // 空合一下：动作照做，只是没夹到东西
+      this.events.onAction?.('closing the gripper');
+      await this.tween(240, (t) => this.setGripperOpening(GRIPPER_OPEN * (1 - t)));
+      this.events.onAction?.(null);
+      return null;
     }
 
     this.events.onAction?.(`grasping ${OBJECTS[best].label}`);

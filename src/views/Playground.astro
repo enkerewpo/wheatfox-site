@@ -360,8 +360,13 @@ import { url } from '@/lib/url';
         }
       },
       // 旁观：把世界照着司机的样子摆好
-      onWorldState: (snap, action) => {
-        if (amDriver) return;             // 自己就是权威，别被回声覆盖
+      onWorldState: (snap, action, isRestore) => {
+        /*
+          平时司机是权威，收到自己发出去的回声要忽略；但**接手/刷新时的那一份
+          restore 例外** —— 那正是「上一个人留下的世界」，不接过来的话刷新一下
+          机器人就回到初始状态，而它明明是同一台。
+        */
+        if (amDriver && !isRestore) return;
         world.applySnapshot(snap);
         drawState();
         if (action) { hudText.textContent = action; hud.hidden = false; }
@@ -780,7 +785,48 @@ import { url } from '@/lib/url';
 
     /* ======================================================== 事件 */
 
+    /* ---- 对话在刷新后要还在 ----
+       时间线本来只活在内存里，刷一下就没了 —— 而刷新常常只是想让画面重来，
+       不是想清空记录。这里把收到的事件按原样存进 sessionStorage，重新加载时
+       照同一条渲染路径重放一遍。存事件不存 HTML：渲染逻辑以后改了，
+       旧记录也还能画出来。 */
+    const LOG_KEY = 'robonix-feed';
+    let eventLog: AgentEvent[] = [];
+    let replaying = false;
+
+    function saveLog() {
+      if (replaying) return;
+      try {
+        // 只留最近一段，别把 storage 撑爆
+        sessionStorage.setItem(LOG_KEY, JSON.stringify(eventLog.slice(-120)));
+      } catch { /* 隐私模式下会抛，丢了就丢了 */ }
+    }
+
+    function replayLog() {
+      let saved: AgentEvent[] = [];
+      try { saved = JSON.parse(sessionStorage.getItem(LOG_KEY) || '[]'); } catch { return; }
+      if (!saved.length) return;
+      replaying = true;
+      for (const e of saved) {
+        // 重放时不再出声、不再触发音效 —— 那些是当时那一刻的事
+        if (e.kind === 'final') {
+          const el = document.createElement('div');
+          el.className = 'pg-msg is-agent';
+          el.innerHTML = '<div class="pg-who">robonix</div>'
+            + `<div class="pg-bubble">${esc(e.text)}</div>`;
+          addToFeed(el);
+        } else {
+          onAgentEvent(e);
+        }
+      }
+      replaying = false;
+      eventLog = saved;
+      clearLive();
+      sealThink();
+    }
+
     function onAgentEvent(e: AgentEvent) {
+      if (!replaying && e.kind !== 'ready') { eventLog.push(e); saveLog(); }
       switch (e.kind) {
         case 'ready':
           break;
@@ -868,7 +914,11 @@ import { url } from '@/lib/url';
       /* ---- 真运行时 ---- */
       if (isLive()) {
         // busy 时这句是 steer，网关会回一条 steer 事件，气泡由那里补
-        if (!busy) pushUser(task);
+        if (!busy) {
+          pushUser(task);
+          eventLog.push({ kind: 'steer', text: task } as any);   // 重放时还原成用户气泡
+          saveLog();
+        }
         if (!agent.submit(task)) {
           pushStatus('Lost the connection to the planner — falling back locally.', true);
           refreshMode();
@@ -902,6 +952,10 @@ import { url } from '@/lib/url';
     }
 
     form.addEventListener('submit', (e) => { e.preventDefault(); submit(input.value); });
+
+    // 放在这里而不是靠前的位置：replayLog 用到的 eventLog / replaying 是 let，
+    // 提前调用会撞上暂时性死区，静默失败成「刷新后对话没了」。
+    replayLog();
 
     /* --------------------------------------------------------- 相机 */
     setInterval(() => {

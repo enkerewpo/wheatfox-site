@@ -23,10 +23,9 @@ const year = new Date().getFullYear();
       {footerCredits.map((c, i) => (
         <>
           {i > 0 && (i === footerCredits.length - 1 ? ' and ' : ', ')}
-          <a class="credit" href={c.href} target="_blank" rel="noopener">
-            {c.icon && <img class="credit-icon" src={c.icon} alt="" width="20" height="20" loading="lazy" decoding="async" />}
-            {c.label}
-          </a>
+          <a href={c.href} target="_blank" rel="noopener">{c.icon && (
+            <span class="credit-icon" aria-hidden="true" style={`background-image:url(${c.icon})`}></span>
+          )}{c.label}</a>
         </>
       ))}
     </div>
@@ -72,19 +71,29 @@ const year = new Date().getFullYear();
     color: var(--border-strong);
   }
 
-  /* 鸣谢里的小图标（Anubis 那只吉祥物）。
-     和文字基线对齐，尺寸写死在 img 上防止加载时布局跳动。 */
-  .credit {
-    display: inline-flex;
-    align-items: center;
-    gap: 0.35em;
-  }
+  /* 鸣谢里的吉祥物（Anubis 那只）。
+     
+     用背景图而不是 <img>，为的是**只露出脑袋**：原图是 512×512 的全身像，
+     缩到一行文字的高度时整个人只有几像素，看不出是什么。背景定位裁到
+     头部那一块（约占原图 55%），放大后就是一个清楚的大头。
+
+     另外这里不能用 inline-flex —— 之前 .credit 是 inline-flex，它会自成一个
+     行盒，于是「and」和「Anubis」落在不同的基线上，看着像换了行。
+     纯 inline-block + vertical-align 才跟着文字走。 */
+  .footer-row:has(.credit-icon) { line-height: 2; }
   .credit-icon {
-    height: 1.35em;
-    width: auto;
-    vertical-align: -0.3em;
-    /* 它是张彩图，暗色下压一点亮度免得太跳 */
-    opacity: 0.9;
+    display: inline-block;
+    width: 1.5em;
+    height: 1.5em;
+    margin-right: 0.3em;
+    /* 图标比一行文字高，行高不放开的话它会顶出行框、和上下两行叠在一起 */
+    vertical-align: -0.45em;
+    background-repeat: no-repeat;
+    /* 放大到 180%，把视口对准头部 */
+    /* 框住「帽子 + 耳朵 + 脸」。原图里这一块大约在 x 12–74%、y 6–66%，
+       所以放大到 168%、视口往上提。
+       不做圆形裁切：那对狼耳是这个吉祥物最好认的地方，圆角正好把它削掉。 */
+    background-size: 168%;
+    background-position: 43% 14%;
   }
-  :root[data-theme='dark'] .credit-icon { opacity: 0.8; }
 </style>
