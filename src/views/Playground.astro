@@ -295,16 +295,24 @@ import { url } from '@/lib/url';
     }
 
     function showSeat(holder: any, waiting: number) {
-      if (!holder) { seatEl.hidden = true; return; }
+      /*
+        没有名字就当没有人 —— 服务端在某些时刻会送来一个空的 holder（比如
+        司机刚断开、座位还在宽限期里），空对象是真值，直接取 name 就会渲染成
+        「undefined is driving the robot」。宁可不显示，也不显示一个假名字。
+      */
+      if (!holder?.name) { seatEl.hidden = true; return; }
       drawAvatar(holder);
       const where = holder.country ? ` from ${holder.country}` : '';
       const left = holder.max_hold_s && holder.held_s !== undefined
         ? Math.max(0, holder.max_hold_s - holder.held_s) : null;
-      seatTxt.innerHTML =
-        `<b>${esc(holder.name)}</b>${esc(where)} is driving the robot`
-        + (left !== null ? ` — about ${Math.ceil(left / 60)} min left` : '')
-        + (waiting > 1 ? ` · ${waiting} waiting` : '')
-        + `. You'll take over automatically.`;
+      seatTxt.innerHTML = holder.reconnecting
+        // 他刚断开、正在回来的路上（多半是刷新）。这几秒座位还是他的。
+        ? `<b>${esc(holder.name)}</b>${esc(where)} is reconnecting — the robot is`
+          + ' held for a few seconds in case they come back.'
+        : `<b>${esc(holder.name)}</b>${esc(where)} is driving the robot`
+          + (left !== null ? ` — about ${Math.ceil(left / 60)} min left` : '')
+          + (waiting > 1 ? ` · ${waiting} waiting` : '')
+          + `. You'll take over automatically.`;
       seatEl.hidden = false;
     }
 
