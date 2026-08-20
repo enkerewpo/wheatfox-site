@@ -106,7 +106,10 @@ type Handler = (args: Record<string, any>) => Promise<unknown> | unknown;
  * 每个 op 对应一个契约能力。名字和 sim_bridge / sim_nav / sim_scene 里
  * `bridge.call(...)` 的第一个参数**必须**一一对应，改一边就要改另一边。
  */
-export function makeHandlers(world: LabWorld): Record<string, Handler> {
+export function makeHandlers(
+  world: LabWorld,
+  speak: (text: string) => Promise<{ ok: boolean; detail: string }>,
+): Record<string, Handler> {
   const view = () => world.worldView();
   const skills = makeSkills(world);
 
@@ -233,6 +236,19 @@ export function makeHandlers(world: LabWorld): Record<string, Handler> {
     'skill.cook':  (a) => skills.cook(String(a.dish ?? '')),
     'skill.wash':  () => skills.wash(),
     'skill.water': (a) => skills.water(String(a.plant_id ?? 'plant')),
+
+    /* --------------------------------------------------------- speech
+       机器人说话是一个**能力**，不是界面装饰。规划器可以把它编进计划，
+       于是「说了什么、什么时候说」都在树上看得见。 */
+
+    'speech.speak': (a) => speak(String(a.text ?? '')),
+    'speech.list_speakers': () => ({
+      speakers_json: JSON.stringify([{
+        provider_id: 'browser_sim',
+        namespace: 'robonix/primitive/audio',
+        description: "the visitor's browser — a speech bubble plus synthesised audio",
+      }]),
+    }),
   };
 }
 
@@ -396,14 +412,20 @@ export type LinkConfig = {
 };
 
 /** 四个 provider 各一条线，名字和 nginx 里的 location 一一对应 */
-const LINES = ['sim', 'nav', 'scene', 'skills'] as const;
+const LINES = ['sim', 'nav', 'scene', 'skills', 'speech'] as const;
 
 export class RobonixLink {
   private lines: Line[] = [];
   readonly states = new Map<string, LinkState>();
 
-  constructor(world: LabWorld, cfg: LinkConfig, events: LinkEvents = {}) {
-    const handlers = makeHandlers(world);
+  constructor(
+    world: LabWorld,
+    cfg: LinkConfig,
+    events: LinkEvents = {},
+    speak: (text: string) => Promise<{ ok: boolean; detail: string }> =
+      async () => ({ ok: false, detail: 'no speech output wired up' }),
+  ) {
+    const handlers = makeHandlers(world, speak);
     const wrapped: LinkEvents = {
       ...events,
       onState: (which, state, detail) => {

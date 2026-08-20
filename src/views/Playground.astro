@@ -189,7 +189,7 @@ import { url } from '@/lib/url';
     countLeaves, type RtdlEnvelope, type RtdlNode,
   } from '@/lib/lab/rtdl';
   import { OBJECTS, PLACES } from '@/lib/lab/scene-spec';
-  import { sfx, setSfxEnabled, sfxEnabled, unlockAudioOnce } from '@/lib/lab/sfx';
+  import { sfx, setSfxEnabled, sfxEnabled, unlockAudioOnce, audioPlayer } from '@/lib/lab/sfx';
   import { RobonixLink, defaultLinkBase } from '@/lib/lab/robonix-link';
   import { AgentClient, type AgentEvent } from '@/lib/lab/agent-client';
   /*
@@ -394,7 +394,7 @@ import { url } from '@/lib/url';
       // 服务器每调一次能力就在 HUD 上闪一下，让「这是远程驱动的」看得见
       onCall: (op) => { hudText.textContent = op; hud.hidden = false; },
       onResult: () => { hud.hidden = true; },
-    });
+    }, speak);
 
     let agentState: 'connecting' | 'online' | 'offline' = 'connecting';
     const agent = new AgentClient(
@@ -535,33 +535,39 @@ import { url } from '@/lib/url';
          · 上一句还没说完就来了下一句。直接打断，别让两句叠在一起。 */
 
     const TTS_URL = '/robonix/tts';
-    let ttsOk = true;                 // 失败一次就不再重试，省得每句都等超时
-    let current: HTMLAudioElement | null = null;
 
     function stopSpeaking() {
-      if (current) { current.pause(); current.src = ''; current = null; }
+      const a = audioPlayer();
+      if (a) { a.pause(); }
       try { speechSynthesis.cancel(); } catch { /* 不支持就算了 */ }
     }
 
-    async function speak(text: string) {
-      if (!sfxEnabled()) return;      // 静音按钮同时管音效和语音
+    /**
+     * 让机器人说话。返回结果 —— speech/speak 这个能力要如实回报成没成。
+     *
+     * iOS 上必须**复用那个在首次触摸时解锁过的 <audio> 元素**：每次
+     * new Audio() 的新元素没被手势激活过，play() 一律被拒，而机器人说话
+     * 总是发生在用户点击之后好几十秒。桌面上一次交互等于长期授权，
+     * 所以这个 bug 只在 iPhone 上出现。
+     */
+    async function speak(text: string): Promise<{ ok: boolean; detail: string }> {
+      bubble.textContent = text;
+      bubble.hidden = false;
+      if (!sfxEnabled()) return { ok: true, detail: 'shown on screen; sound is muted' };
       stopSpeaking();
 
-      if (ttsOk) {
+      const a = audioPlayer();
+      if (a) {
         try {
-          const a = new Audio(`${TTS_URL}?text=${encodeURIComponent(text.slice(0, 220))}`);
-          a.preload = 'auto';
-          current = a;
+          a.src = `${TTS_URL}?text=${encodeURIComponent(text.slice(0, 220))}`;
           await a.play();
-          return;
+          return { ok: true, detail: 'spoken aloud' };
         } catch (e) {
-          // 端点挂了或被限流 —— 记下来，之后直接走浏览器 TTS
-          console.warn('[playground] GLaDOS TTS unavailable, falling back:', e);
-          ttsOk = false;
-          current = null;
+          console.warn('[playground] TTS playback refused, falling back:', e);
         }
       }
       speakWithBrowser(text);
+      return { ok: true, detail: 'spoken with the browser voice' };
     }
 
     /* ---- 回落：浏览器自带 TTS ----
@@ -878,9 +884,7 @@ import { url } from '@/lib/url';
               '<div class="pg-who">robonix</div>' +
               `<div class="pg-bubble">${esc(e.text)}</div>`;
             addToFeed(el);
-            bubble.textContent = e.text;
-            bubble.hidden = false;
-            speak(e.text);
+            speak(e.text);   // 气泡由 speak 自己弹
           }
           sfx.done();
           break;

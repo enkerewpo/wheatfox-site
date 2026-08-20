@@ -139,9 +139,63 @@ export const sfx = {
   },
 };
 
-/** 第一次交互时解锁音频（浏览器自动播放策略） */
+/* ==========================================================================
+   iOS 的两道坎
+   ==========================================================================
+
+   桌面上一次交互就等于长期授权，之后什么时候 play() 都行。iOS Safari 不是：
+
+     1. play() 必须发生在**手势处理器内部**。机器人说话是在任务跑完之后，
+        离用户那次点击几十秒，新建的 Audio 元素一律被拒。
+        解法是第一次触摸时就把一个 <audio> 元素「激活」（播一段静音再暂停），
+        之后复用同一个元素 —— 激活过的元素可以在任何时候用代码播放。
+
+     2. Web Audio 受**物理静音拨片**控制，而 <audio> 元素走媒体通道不受。
+        所以解锁时顺带播一下那个静音元素，把音频会话切到媒体通道，
+        合成音效才有机会出声。拨片确实关着的话，网页无权覆盖 —— 那是系统行为。
+*/
+
+/** 一段极短的静音 WAV，用来激活音频元素 */
+const SILENCE =
+  'data:audio/wav;base64,UklGRiQAAABXQVZFZm10IBAAAAABAAEAgD4AAAB9AAACABAAZGF0YQAAAAA=';
+
+let player: HTMLAudioElement | null = null;
+let unlocked = false;
+
+/**
+ * 拿那个已经解锁的播放器。
+ * 每次都 new Audio() 的话，新元素没被手势激活过，iOS 上必然被拒。
+ */
+export function audioPlayer(): HTMLAudioElement | null {
+  if (typeof window === 'undefined') return null;
+  if (!player) {
+    player = new Audio();
+    player.preload = 'auto';
+    // 让它走媒体通道而不是「网页音效」通道
+    (player as any).playsInline = true;
+  }
+  return player;
+}
+
+export function audioUnlocked() { return unlocked; }
+
+/** 第一次交互时解锁音频。iOS 上这一步不做，之后就再也出不了声。 */
 export function unlockAudioOnce() {
-  const go = () => { ac(); window.removeEventListener('pointerdown', go); window.removeEventListener('keydown', go); };
+  const go = () => {
+    ac();                                   // Web Audio 上下文
+    const a = audioPlayer();
+    if (a) {
+      // 必须在手势里播一次，元素才算被激活
+      a.src = SILENCE;
+      a.play().then(() => { a.pause(); a.currentTime = 0; unlocked = true; })
+              .catch(() => { /* 拒了就拒了，之后回退到浏览器 TTS */ });
+    }
+    window.removeEventListener('pointerdown', go);
+    window.removeEventListener('touchend', go);
+    window.removeEventListener('keydown', go);
+  };
+  // touchend 在 iOS 上比 pointerdown 更可靠地算作「用户手势」
   window.addEventListener('pointerdown', go, { once: true });
+  window.addEventListener('touchend', go, { once: true });
   window.addEventListener('keydown', go, { once: true });
 }
