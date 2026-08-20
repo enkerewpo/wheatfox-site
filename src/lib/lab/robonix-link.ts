@@ -36,9 +36,49 @@ import { makeSkills } from './skills';
 
 export type LinkState = 'connecting' | 'online' | 'offline' | 'busy';
 
+/** 正在开机器人的那个人 —— 只有身份，没有任何对话内容 */
+export type SeatHolder = {
+  name: string;
+  hue: number;
+  shape: number;
+  country?: string;
+  country_code?: string;
+  held_s?: number;
+  max_hold_s?: number;
+};
+
+/**
+ * 这个标签页的会话 id。
+ *
+ * 四个 provider 是四个独立进程，各自判断「谁在开」。没有共同的身份标识就会
+ * 打架：同一个访客拿到两条线、另一个人拿到另外两条，两边都以为自己连上了。
+ * 所以由浏览器自报一个 id，四边按它认人。
+ *
+ * 放 sessionStorage：刷新页面还是同一个人（座位不用重排），关掉标签页就没了。
+ */
+function sessionId(): string {
+  const KEY = 'robonix-session';
+  try {
+    let v = sessionStorage.getItem(KEY);
+    if (!v) {
+      v = (crypto.randomUUID?.() ?? String(Math.random())).slice(0, 32);
+      sessionStorage.setItem(KEY, v);
+    }
+    return v;
+  } catch {
+    return String(Math.random()).slice(2, 18);   // 隐私模式下 storage 会抛
+  }
+}
+
 export type LinkEvents = {
   /** 某条线的状态变了 */
   onState?: (which: string, state: LinkState, detail?: string) => void;
+  /** 座位被别人占着 —— 告诉界面是谁、还有几个人在等 */
+  onSeatBusy?: (holder: SeatHolder | null, waiting: number) => void;
+  /** 自己的座位快到期了 */
+  onSeatExpiring?: (secondsLeft: number, waiting: number) => void;
+  /** 座位被收走了 */
+  onSeatLost?: (message: string) => void;
   /** 服务器调了一个能力 —— 用来在界面上滚动显示 */
   onCall?: (op: string, args: unknown) => void;
   /** 一次调用的结果 */
@@ -200,6 +240,7 @@ class Line {
   constructor(
     readonly name: string,
     readonly url: string,
+    readonly session: string,
     private handlers: Record<string, Handler>,
     private events: LinkEvents,
   ) {}
@@ -218,6 +259,8 @@ class Line {
 
     ws.onopen = () => {
       this.retry = 0;
+      // 先自报家门，四个 provider 才能认出这是同一个访客
+      ws.send(JSON.stringify({ event: 'hello', session: this.session }));
       this.events.onState?.(this.name, 'online');
     };
 
@@ -226,6 +269,14 @@ class Line {
       try { msg = JSON.parse(ev.data as string); }
       catch { return; }
 
+      if (msg.event === 'expiring') {
+        this.events.onSeatExpiring?.(Number(msg.seconds_left) || 0, Number(msg.waiting) || 0);
+        return;
+      }
+      if (msg.event === 'handover') {
+        this.events.onSeatLost?.(String(msg.message ?? 'the robot went to someone else'));
+        return;
+      }
       // provider 说这具身体已经被别人占了
       if (msg.event === 'busy') {
         /*
@@ -234,6 +285,7 @@ class Line {
           这个标志让 onclose 知道刚才发生了什么。
         */
         this.wasBusy = true;
+        this.events.onSeatBusy?.(msg.holder?.name ? msg.holder : null, Number(msg.waiting) || 0);
         this.events.onState?.(this.name, 'busy', msg.message);
         return;
       }
@@ -324,8 +376,9 @@ export class RobonixLink {
       },
     };
     // 路径和 nginx 里的三个 location 对应
+    const session = sessionId();
     for (const name of LINES) {
-      this.lines.push(new Line(name, `${cfg.base}/${name}`, handlers, wrapped));
+      this.lines.push(new Line(name, `${cfg.base}/${name}`, session, handlers, wrapped));
     }
   }
 
