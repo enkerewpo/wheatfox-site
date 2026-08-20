@@ -1200,6 +1200,70 @@ export class LabWorld {
     };
   }
 
+  /* ==========================================================================
+     状态同步 —— 机器人只有一台，所有人看到的必须是同一个
+     ========================================================================== */
+
+  /** 一份能完整还原世界的快照。够小，可以每秒发好几次。 */
+  syncSnapshot() {
+    const objs: Record<string, [number, number, number]> = {};
+    for (const [id, mesh] of this.objects) {
+      const wp = new THREE.Vector3();
+      mesh.getWorldPosition(wp);
+      objs[id] = [+wp.x.toFixed(3), +wp.y.toFixed(3), +wp.z.toFixed(3)];
+    }
+    const placeOf: Record<string, string> = {};
+    for (const [id, p] of this.placeOf) placeOf[id] = p;
+    return {
+      robot: {
+        x: +this.robot.position.x.toFixed(3),
+        z: +this.robot.position.z.toFixed(3),
+        yaw: +this.robot.rotation.y.toFixed(4),
+        pitch: +this.armPivot.rotation.x.toFixed(4),
+        ext: +this.joints.arm_extension_joint.toFixed(4),
+        grip: +this.joints.gripper_finger_joint.toFixed(4),
+      },
+      objects: objs,
+      placeOf,
+      held: this.held,
+    };
+  }
+
+  /**
+   * 按快照还原世界 —— 旁观者靠它看到和司机一模一样的画面。
+   *
+   * 不做插值：位置每秒更新好几次，直接落位已经够顺，而插值会让旁观者
+   * 看到的和司机看到的对不上（同一台机器人，画面必须一致）。
+   */
+  applySnapshot(s: ReturnType<LabWorld['syncSnapshot']> | null | undefined) {
+    if (!s) return;
+    this.robot.position.x = s.robot.x;
+    this.robot.position.z = s.robot.z;
+    this.robot.rotation.y = s.robot.yaw;
+    this.armPivot.rotation.x = s.robot.pitch;
+    this.setArmExtension(s.robot.ext);
+    this.setGripperOpening(s.robot.grip);
+
+    for (const [id, mesh] of this.objects) {
+      const p = s.objects[id];
+      if (!p) continue;
+      const heldNow = s.held === id;
+      // 拿在手里的东西挂在夹爪下，其余落在世界里
+      if (heldNow && mesh.parent !== this.gripper) {
+        this.gripper.add(mesh); mesh.position.set(0, -0.12, 0);
+        mesh.traverse((c) => c.layers.set(0));
+      } else if (!heldNow) {
+        if (mesh.parent !== this.scene) {
+          this.scene.add(mesh);
+          mesh.traverse((c) => c.layers.set(0));
+        }
+        mesh.position.set(p[0], p[1], p[2]);
+      }
+    }
+    this.held = (s.held as ObjectId | null) ?? null;
+    this.placeOf = new Map(Object.entries(s.placeOf) as [ObjectId, PlaceId | 'held'][]);
+  }
+
   /** 停靠点解算 —— goal_near 要用，可站性判断在导航侧 */
   standFor(place: PlaceId): [number, number] {
     return resolveStand(this.grid, place);

@@ -38,35 +38,15 @@ import { url } from '@/lib/url';
     </div>
   </header>
 
-  <div class="pg-intro">
-    <p>
-      <b>The browser is the robot.</b> This page registers with a live
-      <a href="https://github.com/syswonder/robonix">Robonix</a> runtime as four
-      capability providers — the body, its navigation, its semantic map and its
-      skills — so every motion on screen is a real executor dispatch, not a
-      scripted animation.
-    </p>
-    <ol class="pg-steps">
-      <li>Type a chore in plain language, or press one of the examples.</li>
-      <li>A vision-language model turns it into an <b>RTDL</b> plan; the tree
-        appears on the right and its nodes light up as the executor walks them.</li>
-      <li>Send another message while it works — that <b>steers</b> the plan
-        mid-flight rather than starting a new one.</li>
-    </ol>
-    <dl class="pg-facts">
-      <div><dt>Brain</dt><dd id="pg-brain">reading from the runtime…</dd></div>
-      <div><dt>Robot</dt><dd>one arm on a wheeled base; reaches 0.35–0.88 m, carries
-        one object at a time, and has no object detector — it knows the room from a
-        semantic map, not from vision.</dd></div>
-      <div><dt>Your turn</dt><dd>one visitor drives at a time, up to 5 minutes,
-        with a warning a minute before. Reload for a fresh apartment.</dd></div>
-      <div><dt>Limits</dt><dd>30 tasks per hour per visitor. Each one spends real
-        tokens, so the robot will tell you when it cannot do something instead of
-        pretending.</dd></div>
-    </dl>
-  </div>
+  <p class="pg-intro">
+    <b>The browser is the robot.</b> This page is a live
+    <a href="https://github.com/syswonder/robonix">Robonix</a> runtime — a model
+    plans, the executor runs it, and what you see is the dispatch. There is one
+    robot: everyone watches the same room, and you take turns driving it.
+    <span id="pg-brain" class="pg-dim"></span>
+  </p>
 
-  <!-- 别人正在开的时候显示他是谁；只有身份，没有任何对话内容 -->
+  <!-- 谁在开。旁观时显示，拿到座位就收起 -->
   <div class="pg-seat" id="pg-seat" hidden>
     <span class="pg-avatar" id="pg-avatar"></span>
     <span class="pg-seat-text" id="pg-seat-text"></span>
@@ -328,8 +308,65 @@ import { url } from '@/lib/url';
       seatEl.hidden = false;
     }
 
+    /* ---- 司机 / 旁观 ----
+       机器人只有一台。开车的人上报世界状态，服务器转播给所有旁观者，
+       所以每个人屏幕上是同一个机器人、同一个房间。旁观者不能下指令 ——
+       留一个能按却没用的按钮，比直接说清楚更让人困惑。 */
+    let amDriver = false;
+
+    function setRole(driver: boolean) {
+      amDriver = driver;
+      input.disabled = !driver;
+      goBtn.disabled = !driver;
+      form.classList.toggle('is-watching', !driver);
+      if (!driver) {
+        input.value = '';
+        input.placeholder = 'Watching — the robot is someone else\'s turn';
+        goBtn.textContent = 'Watching';
+        // 空状态文案也要跟着变，别叫旁观者去下指令
+        if (emptyEl && feedEl.children.length <= 1) {
+          emptyEl.textContent =
+            'You are watching the robot someone else is driving. The room and the '
+            + 'robot you see are the real ones — their conversation stays private. '
+            + 'When their turn ends you take over automatically.';
+        }
+      } else {
+        setBusy(busy);
+      }
+      refreshMode();
+    }
+
+    /* 司机每 250 ms 上报一次世界。够密，旁观者看着是连续的；
+       快照本身只有几百字节，不构成负担。 */
+    let pushTimer = 0;
+    function startPushing() {
+      if (pushTimer) return;
+      pushTimer = window.setInterval(() => {
+        if (amDriver) link.pushState(world.syncSnapshot(), hudText.textContent || null);
+      }, 250);
+    }
+
     const link = new RobonixLink(world, { base: defaultLinkBase() }, {
       onState: () => refreshMode(),
+      onRole: (role, holder, waiting, message) => {
+        setRole(role === 'driver');
+        if (role === 'driver') {
+          seatEl.hidden = true;
+          startPushing();
+          if (message) pushStatus(message, true);
+        } else {
+          showSeat(holder, waiting);
+          if (message) pushStatus(message, true);
+        }
+      },
+      // 旁观：把世界照着司机的样子摆好
+      onWorldState: (snap, action) => {
+        if (amDriver) return;             // 自己就是权威，别被回声覆盖
+        world.applySnapshot(snap);
+        drawState();
+        if (action) { hudText.textContent = action; hud.hidden = false; }
+        else hud.hidden = true;
+      },
       onSeatBusy: (holder, waiting) => showSeat(holder, waiting),
       onSeatExpiring: (left, waiting) => {
         pushStatus(
@@ -357,6 +394,14 @@ import { url } from '@/lib/url';
     function isLive() { return link.online && agentState === 'online'; }
 
     function refreshMode() {
+      if (isLive() && !amDriver) {
+        modeEl.textContent = 'watching';
+        modeEl.classList.remove('is-live');
+        modeEl.title =
+          'One robot, shared by everyone here. You are seeing exactly what the '
+          + 'current driver sees; you take over automatically when their turn ends.';
+        return;
+      }
       if (isLive()) {
         seatEl.hidden = true;
         modeEl.textContent = `live · ${VLM_MODEL}`;
@@ -418,12 +463,7 @@ import { url } from '@/lib/url';
         refreshMode();
 
         const brain = document.getElementById('pg-brain');
-        if (brain) {
-          brain.innerHTML =
-            `<b>${esc(st.vlm.model ?? 'unknown')}</b>`
-            + (st.vlm.endpoint ? ` <span class="prov-dim">via ${esc(st.vlm.endpoint)}</span>` : '')
-            + ' — it only ever <em>proposes</em> a plan; the runtime checks and runs it.';
-        }
+        if (brain) brain.textContent = `Brain: ${st.vlm.model ?? 'unknown'}.`;
 
         const row = (k: string, v: string) => `<div><dt>${k}</dt><dd>${v}</dd></div>`;
         const dim = (t: string) => `<span class="prov-dim">${esc(t)}</span>`;
@@ -819,6 +859,10 @@ import { url } from '@/lib/url';
     /* --------------------------------------------------------- 执行 */
     async function submit(task: string) {
       if (!task.trim()) return;
+      if (!amDriver && isLive()) {
+        pushStatus('Someone else is driving — you can watch, but not send commands yet.', true);
+        return;
+      }
       input.value = '';
 
       /* ---- 真运行时 ---- */
@@ -917,53 +961,13 @@ import { url } from '@/lib/url';
   /* ---- 开头的使用说明 ---- */
   .pg-intro {
     max-width: var(--w-prose);
-    margin: 0 0 var(--sp-5);
+    margin: 0 0 var(--sp-4);
     font-size: var(--fs-sm);
     line-height: var(--lh-base);
     color: var(--text-muted);
   }
-  .pg-intro p { margin: 0 0 var(--sp-3); }
   .pg-intro b { color: var(--text); }
-  .pg-steps {
-    margin: 0 0 var(--sp-4);
-    padding-left: 1.4em;
-  }
-  .pg-steps li { margin-bottom: var(--sp-1); }
-  .pg-facts {
-    display: grid;
-    grid-template-columns: 6.5rem minmax(0, 1fr);
-    gap: var(--sp-2) var(--sp-4);
-    margin: 0;
-    padding-top: var(--sp-3);
-    border-top: 1px solid var(--border);
-    font-size: var(--fs-xs);
-  }
-  .pg-facts > div { display: contents; }
-  .pg-facts dt {
-    font-family: var(--font-mono);
-    color: var(--text-faint);
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
-  }
-  .pg-facts dd { margin: 0; }
-  @media (max-width: 46rem) {
-    .pg-facts { grid-template-columns: minmax(0, 1fr); gap: 0 0; }
-    .pg-facts dt { margin-top: var(--sp-2); }
-  }
-
-  /* ---- 谁在开机器人 ---- */
-  .pg-seat {
-    display: flex;
-    align-items: center;
-    gap: var(--sp-3);
-    margin: 0 0 var(--sp-4);
-    padding: var(--sp-3) var(--sp-4);
-    border: 1px solid var(--border-strong);
-    border-radius: var(--radius-md);
-    background: var(--bg-subtle);
-    font-size: var(--fs-sm);
-    color: var(--text-muted);
-  }
+  .pg-dim { color: var(--text-faint); }
   .pg-avatar { flex: none; display: block; }
   .pg-avatar :global(svg) { display: block; width: 2rem; height: 2rem; }
   .pg-seat-text :global(b) { color: var(--text); }
@@ -1005,6 +1009,15 @@ import { url } from '@/lib/url';
   .pg-ask button:hover { background: var(--link-hover); border-color: var(--link-hover); }
   /* 机器人在干活时按钮变成 Steer —— 用颜色说明「这次是插话，不是新任务」 */
   .pg-ask button.is-steer { background: var(--link); border-color: var(--link); }
+  /* 旁观时输入区整体变灰，一眼看出「现在只能看」 */
+  .pg-ask.is-watching input,
+  .pg-ask.is-watching button {
+    opacity: 0.5;
+    cursor: not-allowed;
+    background: var(--bg-subtle);
+    color: var(--text-faint);
+    border-color: var(--border);
+  }
   .pg-hint {
     margin: var(--sp-2) 0 0;
     font-size: var(--fs-xs); line-height: var(--lh-base);

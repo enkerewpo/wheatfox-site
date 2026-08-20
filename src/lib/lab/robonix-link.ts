@@ -73,6 +73,13 @@ function sessionId(): string {
 export type LinkEvents = {
   /** 某条线的状态变了 */
   onState?: (which: string, state: LinkState, detail?: string) => void;
+  /** 角色定了：开车还是旁观 */
+  onRole?: (role: 'driver' | 'spectator', holder: SeatHolder | null,
+            waiting: number, message?: string) => void;
+  /** 某一条线报了角色（内部用来汇总「四条是否一致」） */
+  onLineRole?: (which: string, role: 'driver' | 'spectator') => void;
+  /** 旁观时收到的世界状态 —— 机器人只有一台，画面必须和司机一致 */
+  onWorldState?: (snapshot: any, action?: string | null) => void;
   /** 座位被别人占着 —— 告诉界面是谁、还有几个人在等 */
   onSeatBusy?: (holder: SeatHolder | null, waiting: number) => void;
   /** 自己的座位快到期了 */
@@ -236,6 +243,8 @@ class Line {
   private timer: number | null = null;
   /** 上一次断开是因为座位被占，而不是网络问题 */
   private wasBusy = false;
+  /** 服务端分配的角色。旁观者不接能力调用。 */
+  role: 'driver' | 'spectator' = 'spectator';
 
   constructor(
     readonly name: string,
@@ -269,6 +278,24 @@ class Line {
       try { msg = JSON.parse(ev.data as string); }
       catch { return; }
 
+      if (msg.event === 'role') {
+        this.role = msg.role;
+        this.events.onLineRole?.(this.name, msg.role);
+        this.events.onRole?.(msg.role, msg.holder ?? null,
+                             Number(msg.waiting) || 0, msg.message);
+        // 接手时把上一个人留下的世界原样接过来，不重置
+        if (msg.restore) this.events.onWorldState?.(msg.restore, null);
+        return;
+      }
+      if (msg.event === 'state') {
+        this.events.onWorldState?.(msg.snapshot, msg.action);
+        return;
+      }
+      if (msg.event === 'seat') {
+        this.events.onSeatBusy?.(msg.holder?.name ? msg.holder : null,
+                                 Number(msg.waiting) || 0);
+        return;
+      }
       if (msg.event === 'expiring') {
         this.events.onSeatExpiring?.(Number(msg.seconds_left) || 0, Number(msg.waiting) || 0);
         return;
@@ -314,6 +341,11 @@ class Line {
 
     ws.onclose = () => { this.ws = null; this.scheduleRetry('connection closed'); };
     ws.onerror = () => { /* onclose 随后就到，重连逻辑只写一处 */ };
+  }
+
+  /** 往这条线发一条不带 id 的事件消息 */
+  send(payload: unknown) {
+    if (this.ws?.readyState === WebSocket.OPEN) this.ws.send(JSON.stringify(payload));
   }
 
   private reply(id: number, ok: boolean, result?: unknown, error?: string) {
@@ -372,8 +404,10 @@ export class RobonixLink {
       ...events,
       onState: (which, state, detail) => {
         this.states.set(which, state);
+        if (state !== 'online') this.roles.delete(which);
         events.onState?.(which, state, detail);
       },
+      onLineRole: (which, role) => { this.roles.set(which, role); },
     };
     // 路径和 nginx 里的三个 location 对应
     const session = sessionId();
@@ -382,10 +416,44 @@ export class RobonixLink {
     }
   }
 
-  start() { for (const l of this.lines) l.connect(); }
+  start() {
+    for (const l of this.lines) l.connect();
+    /*
+      关标签页时干净地断开。
+
+      不这么做的话，服务端只能靠心跳发现人没了 —— 中间那几秒机器人被一个
+      已经关掉的页面占着，下一个人白等。pagehide 在移动端比 beforeunload
+      可靠（iOS 上后者常常不触发）。
+    */
+    addEventListener('pagehide', () => this.stop());
+  }
+
   stop() { for (const l of this.lines) l.close(); }
 
-  /** 四条都在线才算这具身体真的接上了 */
+  /**
+   * 我是不是司机。
+   *
+   * **四条线都得是**。四个 provider 各自判断座位，短暂的不一致是可能的
+   * （一条线的旧连接还没清干净）。只要有一条说我不是司机，能力调用就会
+   * 发到别人那儿去，这时候让我以为自己在开是最糟的 —— 界面能输入，
+   * 指令却半数发不出去。
+   */
+  get driving(): boolean {
+    return LINES.every((n) => this.roles.get(n) === 'driver');
+  }
+
+  readonly roles = new Map<string, 'driver' | 'spectator'>();
+
+  /**
+   * 上报世界状态。只有司机需要发 —— 服务器转播给所有旁观者，
+   * 这样一台机器人在所有人屏幕上是同一个状态。
+   * 只走 sim 这一条线，四条都发纯属浪费。
+   */
+  pushState(snapshot: unknown, action?: string | null) {
+    this.lines[0]?.send({ event: 'state', snapshot, action });
+  }
+
+  /** 四条都连上了（不论是开车还是旁观） */
   get online(): boolean {
     return LINES.every((n) => this.states.get(n) === 'online');
   }
