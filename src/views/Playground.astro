@@ -39,9 +39,15 @@ import { url } from '@/lib/url';
   </header>
 
   <p class="pg-lede">
-    The browser is the robot's <b>body</b>: this page registers with Robonix as three
+    The browser is the robot's <b>body</b>: this page registers with Robonix as four
     capability providers, so every motion you see is a real executor dispatch.
     Ask it to do a chore — and send another message while it works to steer it.
+  </p>
+  <p class="pg-lede pg-lede-dim">
+    There is one robot, and the page you are looking at is it — so only one visitor
+    drives at a time, and reloading gives you a fresh apartment. If someone else has
+    the seat you will see it say so; it frees up when they leave, or after three
+    minutes of them not issuing a command.
   </p>
 
   <!--
@@ -303,12 +309,13 @@ import { url } from '@/lib/url';
           之前这里一律显示成 local fallback，把「排队」说成了「连不上」，
           完全是两回事。
         */
-        modeEl.textContent = 'another visitor is driving';
+        modeEl.textContent = 'waiting for the robot';
         modeEl.classList.remove('is-live');
         modeEl.title =
-          'The runtime is up, but there is only one robot and someone else is '
-          + 'attached to it right now. This page falls back to a local planner until '
-          + 'they leave; it reconnects on its own.';
+          'There is one robot and someone else is attached to it. The seat frees up '
+          + 'when they close the page, or after three minutes of them not issuing any '
+          + 'command. This page keeps asking and takes over the moment it is free; '
+          + 'until then it plans locally so you can still try things.';
         if (provNote) provNote.textContent = '';
         return;
       } else {
@@ -1044,6 +1051,7 @@ import { url } from '@/lib/url';
     letter-spacing: var(--ls-tight);
     margin: 0 0 var(--sp-3);
   }
+  .pg-lede-dim { color: var(--text-faint); font-size: var(--fs-sm); margin-top: calc(-1 * var(--sp-3)); }
   .page-lede {
     max-width: var(--w-prose);
     color: var(--text-muted);

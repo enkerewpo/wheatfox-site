@@ -194,6 +194,8 @@ class Line {
   private retry = 0;
   private closed = false;
   private timer: number | null = null;
+  /** 上一次断开是因为座位被占，而不是网络问题 */
+  private wasBusy = false;
 
   constructor(
     readonly name: string,
@@ -226,6 +228,12 @@ class Line {
 
       // provider 说这具身体已经被别人占了
       if (msg.event === 'busy') {
+        /*
+          记下来。provider 说完 busy 就会关掉连接，紧接着的 onclose 会把状态
+          改写成 offline —— 于是界面显示「连不上」，而真相是「有人在用」。
+          这个标志让 onclose 知道刚才发生了什么。
+        */
+        this.wasBusy = true;
         this.events.onState?.(this.name, 'busy', msg.message);
         return;
       }
@@ -263,6 +271,20 @@ class Line {
 
   private scheduleRetry(detail: string) {
     if (this.closed) return;
+
+    if (this.wasBusy) {
+      /*
+        座位被别人占着。这种情况**必须慢慢等**：provider 说完 busy 就关连接，
+        照常规退避重连的话第一次只等 0.8 秒，于是变成每秒十几次的重连风暴 ——
+        既刷爆日志，也让状态在 busy/offline 之间反复横跳，界面最后停在
+        「连不上」。等 5 秒问一次就够了，人也不会一直盯着。
+      */
+      this.wasBusy = false;
+      this.events.onState?.(this.name, 'busy', detail);
+      this.timer = window.setTimeout(() => this.connect(), 5000);
+      return;
+    }
+
     this.events.onState?.(this.name, 'offline', detail);
     // 指数退避，封顶 15s —— 服务器重启时不要把它打死
     const wait = Math.min(15000, 800 * 2 ** Math.min(this.retry++, 5));
