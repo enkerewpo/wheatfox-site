@@ -423,13 +423,16 @@ export class RobonixLink {
   start() {
     for (const l of this.lines) l.connect();
     /*
-      关标签页时干净地断开。
+      这里**故意不监听 pagehide**。
 
-      不这么做的话，服务端只能靠心跳发现人没了 —— 中间那几秒机器人被一个
-      已经关掉的页面占着，下一个人白等。pagehide 在移动端比 beforeunload
-      可靠（iOS 上后者常常不触发）。
+      曾经在 pagehide 里主动断开，想让关掉的标签页立刻让出座位。在桌面上没
+      问题，在 iOS Safari 上是灾难：切换 App、页面进 bfcache 都会触发 pagehide，
+      于是用户只是看了一眼别的应用，机器人的连接就被自己人掐断，正在跑的能力
+      调用当场失败（1001 going away）。
+
+      改由服务端判断：心跳 8 秒，加上 10 秒的重连宽限，真正关掉的页面最多
+      十几秒就会让出座位 —— 慢一点，但不会误伤还在用的人。
     */
-    addEventListener('pagehide', () => this.stop());
   }
 
   stop() { for (const l of this.lines) l.close(); }
